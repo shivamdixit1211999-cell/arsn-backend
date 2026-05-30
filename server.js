@@ -39,7 +39,7 @@ async function sendWA(phoneId, token, to, body) {
   });
 }
 
-// Express middleware — resolves Supabase JWT → sets req.tenantId
+// Express middleware — resolves Supabase JWT → sets req.tenantId + req.tenantPlan
 async function requireAuth(req, res, next) {
   const token = req.headers.authorization?.replace("Bearer ", "");
   if (!token) return res.status(401).json({ error: "No token" });
@@ -49,7 +49,26 @@ async function requireAuth(req, res, next) {
     .from("tenant_members").select("tenant_id").eq("user_id", user.id).single();
   if (!member) return res.status(403).json({ error: "No tenant" });
   req.tenantId = member.tenant_id;
+  const { data: tenant } = await supabase.from("tenants").select("plan").eq("id", req.tenantId).single();
+  req.tenantPlan = tenant?.plan || "free";
   next();
+}
+
+// Plan enforcement middleware factory
+function requirePlan(requiredPlan) {
+  const tiers = ["free", "paid"];
+  return (req, res, next) => {
+    if (tiers.indexOf(req.tenantPlan) < tiers.indexOf(requiredPlan))
+      return res.status(403).json({ error: `This feature requires the ${requiredPlan} plan` });
+    next();
+  };
+}
+
+// Log a lead activity (fire-and-forget)
+function logActivity(tenantId, leadId, type, metadata = {}) {
+  return supabase.from("lead_activities")
+    .insert({ tenant_id: tenantId, lead_id: leadId, type, metadata })
+    .then(() => {}).catch(e => console.error("activity log error:", e));
 }
 
 // ─── Landing page ─────────────────────────────────────────────────────────────
@@ -510,11 +529,13 @@ app.patch("/api/leads/:id", requireAuth, async (req, res) => {
   const { data, error } = await supabase
     .from("leads").update(updates).eq("id", req.params.id).eq("tenant_id", req.tenantId).select().single();
   if (error || !data) return res.status(404).json({ error: "Lead not found" });
+  if (updates.state) logActivity(req.tenantId, data.id, "state_change", { state: updates.state });
+  if (updates.notes) logActivity(req.tenantId, data.id, "note_added", { note: updates.notes.slice(0, 100) });
   res.json(data);
 });
 
-// Bulk lead import
-app.post("/api/leads/import", requireAuth, async (req, res) => {
+// Bulk lead import — paid plan only
+app.post("/api/leads/import", requireAuth, requirePlan("paid"), async (req, res) => {
   const { leads } = req.body;
   if (!Array.isArray(leads) || !leads.length)
     return res.status(400).json({ error: "leads array required" });
@@ -556,6 +577,7 @@ app.post("/api/leads/:id/followup", requireAuth, async (req, res) => {
     .insert({ tenant_id: req.tenantId, lead_id: lead.id, message: message.trim(), send_at, sent: false })
     .select().single();
   if (error) return res.status(500).json({ error: error.message });
+  logActivity(req.tenantId, lead.id, "followup_scheduled", { send_at, message: message.trim().slice(0, 100) });
   res.json({ ok: true, followup: data });
 });
 
@@ -601,21 +623,35 @@ app.post("/api/leads/:id/payment-link", requireAuth, async (req, res) => {
       .catch(e => console.error("WhatsApp send error:", e));
   }
 
+  logActivity(req.tenantId, lead.id, "payment_link_sent", { amount, description, url: paymentLink.short_url });
   res.json({ ok: true, payment_link: paymentLink.short_url, order });
 });
 
-// Conversations — paginated
+// Conversations — paginated, searchable by message content
 app.get("/api/conversations", requireAuth, async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
   const from = (page - 1) * limit;
 
-  const { data: convs, error, count } = await supabase
+  let convIds = null;
+  if (req.query.search) {
+    const { data: msgMatches } = await supabase
+      .from("messages").select("conversation_id")
+      .eq("tenant_id", req.tenantId)
+      .ilike("content", `%${req.query.search}%`);
+    convIds = [...new Set((msgMatches || []).map(m => m.conversation_id))];
+    if (!convIds.length) return res.json({ conversations: [], total: 0, page, limit });
+  }
+
+  let query = supabase
     .from("conversations")
     .select("id, is_ai_active, created_at, lead:leads(id, phone, state, source, last_activity_at)", { count: "exact" })
     .eq("tenant_id", req.tenantId)
     .order("created_at", { ascending: false })
     .range(from, from + limit - 1);
+  if (convIds) query = query.in("id", convIds);
+
+  const { data: convs, error, count } = await query;
   if (error) return res.status(500).json({ error: error.message });
 
   const withPreviews = await Promise.all((convs || []).map(async (c) => {
@@ -678,6 +714,7 @@ app.post("/api/conversations/:id/handoff", requireAuth, async (req, res) => {
     });
   }
 
+  logActivity(req.tenantId, conv.lead.id, "handoff", { message: handoffMessage.slice(0, 100) });
   res.json({ ok: true, is_ai_active: false, lead_state: "qualified" });
 });
 
@@ -691,7 +728,7 @@ app.post("/api/conversations/:id/resume-ai", requireAuth, async (req, res) => {
 
 // Broadcast
 const broadcastLimiter = rateLimit({ windowMs: 3_600_000, max: 10, standardHeaders: true, legacyHeaders: false });
-app.post("/api/broadcast", broadcastLimiter, requireAuth, async (req, res) => {
+app.post("/api/broadcast", broadcastLimiter, requireAuth, requirePlan("paid"), async (req, res) => {
   const { message, filter = {}, lead_ids } = req.body;
   if (!message?.trim()) return res.status(400).json({ error: "message is required" });
 
@@ -743,6 +780,53 @@ app.get("/api/analytics", requireAuth, async (req, res) => {
     revenue_total: revenue,
     avg_order_value: converted > 0 ? Math.round(revenue / converted) : 0,
   });
+});
+
+// Send a WhatsApp message directly to a lead
+app.post("/api/leads/:id/send", requireAuth, async (req, res) => {
+  const { message } = req.body;
+  if (!message?.trim()) return res.status(400).json({ error: "message required" });
+
+  const { data: lead } = await supabase
+    .from("leads").select("id, phone").eq("id", req.params.id).eq("tenant_id", req.tenantId).single();
+  if (!lead) return res.status(404).json({ error: "Lead not found" });
+
+  const { data: tenant } = await supabase
+    .from("tenants").select("whatsapp_phone_id, whatsapp_token").eq("id", req.tenantId).single();
+  if (!tenant?.whatsapp_phone_id || !tenant?.whatsapp_token)
+    return res.status(400).json({ error: "WhatsApp not configured — add credentials in Settings" });
+
+  const r = await sendWA(tenant.whatsapp_phone_id, tenant.whatsapp_token, lead.phone, message.trim());
+  if (!r.ok) return res.status(502).json({ error: "Failed to send message" });
+
+  // Log in conversation messages if a conversation exists
+  const { data: conv } = await supabase
+    .from("conversations").select("id").eq("lead_id", lead.id).eq("tenant_id", req.tenantId)
+    .order("created_at", { ascending: false }).limit(1).single();
+  if (conv) {
+    await supabase.from("messages").insert({
+      tenant_id: req.tenantId, conversation_id: conv.id, role: "ai", content: message.trim(),
+    });
+  }
+
+  logActivity(req.tenantId, lead.id, "message_sent", { message: message.trim().slice(0, 100) });
+  res.json({ ok: true });
+});
+
+// Lead activity timeline
+app.get("/api/leads/:id/activity", requireAuth, async (req, res) => {
+  const { data: lead } = await supabase
+    .from("leads").select("id").eq("id", req.params.id).eq("tenant_id", req.tenantId).single();
+  if (!lead) return res.status(404).json({ error: "Lead not found" });
+
+  const { data, error } = await supabase
+    .from("lead_activities")
+    .select("id, type, metadata, created_at")
+    .eq("lead_id", lead.id)
+    .eq("tenant_id", req.tenantId)
+    .order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ activity: data || [] });
 });
 
 // Orders — list with optional ?status=pending|paid|failed
