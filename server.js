@@ -219,16 +219,73 @@ app.post("/api/webhook/whatsapp", async (req, res) => {
   } catch(e) { console.error(e); }
 });
 
-// Get leads
+const VALID_STATES = ["new", "engaged", "qualified", "converted", "lost"];
+
+// List leads — supports ?state=engaged&source=whatsapp&search=phone
 app.get("/api/leads", async (req, res) => {
-  const token = req.headers.authorization?.replace("Bearer ", "");
-  if (!token) return res.status(401).json({ error: "No token" });
-  const { data: { user } } = await supabase.auth.getUser(token);
-  if (!user) return res.status(401).json({ error: "Invalid token" });
-  const { data: member } = await supabase.from("tenant_members").select("tenant_id").eq("user_id", user.id).single();
-  if (!member) return res.status(403).json({ error: "No tenant" });
-  const { data } = await supabase.from("leads").select("*").eq("tenant_id", member.tenant_id).order("last_activity_at", { ascending: false });
+  const tid = await getTenant(req, res);
+  if (!tid) return;
+
+  let query = supabase.from("leads").select("*").eq("tenant_id", tid);
+  if (req.query.state) query = query.eq("state", req.query.state);
+  if (req.query.source) query = query.eq("source", req.query.source);
+  if (req.query.search) query = query.ilike("phone", `%${req.query.search}%`);
+  query = query.order("last_activity_at", { ascending: false });
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ leads: data || [] });
+});
+
+// Get single lead with conversation summaries
+app.get("/api/leads/:id", async (req, res) => {
+  const tid = await getTenant(req, res);
+  if (!tid) return;
+
+  const { data: lead, error } = await supabase
+    .from("leads")
+    .select("*")
+    .eq("id", req.params.id)
+    .eq("tenant_id", tid)
+    .single();
+
+  if (error || !lead) return res.status(404).json({ error: "Lead not found" });
+
+  const { data: conversations } = await supabase
+    .from("conversations")
+    .select("id, is_ai_active, created_at")
+    .eq("lead_id", lead.id)
+    .eq("tenant_id", tid)
+    .order("created_at", { ascending: false });
+
+  res.json({ lead, conversations: conversations || [] });
+});
+
+// Update lead — state, name, notes
+app.patch("/api/leads/:id", async (req, res) => {
+  const tid = await getTenant(req, res);
+  if (!tid) return;
+
+  const { state, name, notes } = req.body;
+  if (state && !VALID_STATES.includes(state)) {
+    return res.status(400).json({ error: `state must be one of: ${VALID_STATES.join(", ")}` });
+  }
+
+  const allowed = ["state", "name", "notes"];
+  const updates = Object.fromEntries(Object.entries(req.body).filter(([k]) => allowed.includes(k)));
+  if (!Object.keys(updates).length) return res.status(400).json({ error: "Nothing to update" });
+  updates.last_activity_at = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("leads")
+    .update(updates)
+    .eq("id", req.params.id)
+    .eq("tenant_id", tid)
+    .select()
+    .single();
+
+  if (error || !data) return res.status(404).json({ error: "Lead not found" });
+  res.json(data);
 });
 
 // Analytics
