@@ -369,6 +369,7 @@ function Nav({page,setPage}) {
   const [mega,setMega]         = useState(null);
   const [searchVal,setSearchVal] = useState("");
   const [searchFocus,setSF]    = useState(false);
+  const [menuOpen,setMenuOpen] = useState(false);
   const timerRef = useRef(null);
   const searchRef = useRef();
 
@@ -555,7 +556,7 @@ function Nav({page,setPage}) {
               <line x1="3" y1="6" x2="21" y2="6"/>
               <path d="M16 10a4 4 0 01-8 0"/>
             </svg>
-            <span style={{fontSize:12,fontWeight:600,color:T.text}}>Cart</span>
+            {!isMobile && <span style={{fontSize:12,fontWeight:600,color:T.text}}>Cart</span>}
             {cartCount>0 && (
               <span style={{background:T.emerald,color:"#fff",borderRadius:"50%",
                 width:17,height:17,fontSize:9,fontWeight:800,display:"flex",
@@ -564,6 +565,18 @@ function Nav({page,setPage}) {
               </span>
             )}
           </button>
+          {/* Hamburger — mobile only */}
+          {isMobile && (
+            <button onClick={()=>setMenuOpen(m=>!m)}
+              style={{display:"flex",flexDirection:"column",justifyContent:"center",gap:4,
+                padding:"9px 10px",background:menuOpen?T.emerald:T.ivoryAlt,
+                border:`1px solid ${menuOpen?T.emerald:T.border}`,cursor:"pointer",fontFamily:"inherit",
+                transition:"all .15s"}}>
+              <span style={{display:"block",width:16,height:1.5,background:menuOpen?"#fff":T.text,transition:"all .2s"}}/>
+              <span style={{display:"block",width:16,height:1.5,background:menuOpen?"#fff":T.text,transition:"all .2s"}}/>
+              <span style={{display:"block",width:10,height:1.5,background:menuOpen?"#fff":T.text,transition:"all .2s"}}/>
+            </button>
+          )}
         </div>
       </div>
 
@@ -610,7 +623,7 @@ function Nav({page,setPage}) {
       </div>
 
       {/* Mega menu */}
-      {mega && MEGA_SUBS[mega] && (
+      {mega && MEGA_SUBS[mega] && !isMobile && (
         <div onMouseEnter={()=>openMega(mega)} onMouseLeave={closeMega}
           style={{background:T.white,borderBottom:`1px solid ${T.border}`,
             padding:"22px 32px",boxShadow:`0 8px 32px ${T.shadow}`,
@@ -645,6 +658,57 @@ function Nav({page,setPage}) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Mobile slide-out menu */}
+      {menuOpen && (
+        <>
+          <div onClick={()=>setMenuOpen(false)}
+            style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:1099,backdropFilter:"blur(2px)"}}/>
+          <div style={{position:"fixed",top:0,left:0,bottom:0,width:282,background:T.white,
+            zIndex:1100,overflowY:"auto",boxShadow:"4px 0 40px rgba(0,0,0,.18)",
+            animation:"fadeIn .18s ease"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              padding:"18px 20px 14px",borderBottom:`1px solid ${T.border}`}}>
+              <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:21,fontWeight:500,
+                color:T.emerald,fontStyle:"italic",letterSpacing:"0.04em"}}>Dozeage</span>
+              <button onClick={()=>setMenuOpen(false)}
+                style={{background:"none",border:"none",fontSize:24,color:T.textMuted,
+                  cursor:"pointer",fontFamily:"inherit",lineHeight:1,padding:"0 2px"}}>×</button>
+            </div>
+            <div style={{padding:"8px 0"}}>
+              {[
+                ["home","Home"],["skin","Skincare"],["hair","Hair"],["wellness","Wellness"],
+                ["makeup","Makeup"],["body","Body"],["mens","Men"],["brands","Brands"],
+                ["quiz","Skin Quiz"],["myskin","My Skin"],["consult","Consult a Derm"],
+                ["wishlist","Wishlist"],["b2b","B2B / Wholesale"],
+              ].map(([pg,label])=>(
+                <button key={pg} onClick={()=>{setPage(pg);setMenuOpen(false);}}
+                  style={{display:"block",width:"100%",textAlign:"left",padding:"12px 20px",
+                    background:"transparent",border:"none",fontSize:13,fontWeight:page===pg?700:500,
+                    color:page===pg?T.emerald:T.text,cursor:"pointer",fontFamily:"inherit",
+                    borderLeft:`3px solid ${page===pg?T.emerald:"transparent"}`,
+                    transition:"background .1s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.ivoryAlt}
+                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div style={{margin:"8px 20px 0",paddingTop:16,borderTop:`1px solid ${T.border}`}}>
+              {user ? (
+                <div>
+                  <div style={{fontSize:12,color:T.textMuted,marginBottom:8}}>
+                    Signed in as <strong style={{color:T.text}}>{user.name.split(" ")[0]}</strong>
+                  </div>
+                  <Btn v="outline" sz="sm" onClick={()=>{setPage("account");setMenuOpen(false);}}>My Account</Btn>
+                </div>
+              ) : (
+                <Btn onClick={()=>{setMenuOpen(false);setAuthOpen(true);}}>Sign In / Sign Up</Btn>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -1209,8 +1273,10 @@ function Home({setPage}) {
 // ─── PAGE: CATALOG ────────────────────────────────────────────────────────────
 function Catalog({cat}) {
   const {addCart,cart} = useCtx();
+  const isMobile = useWindowWidth() < 768;
   const [filters,setFilters] = useState({sort:"default",sub:"all",price:"all"});
   const [search,setSearch]   = useState("");
+  const [filterOpen,setFilterOpen] = useState(false);
   const setF = (k,v) => setFilters(p=>({...p,[k]:v}));
 
   const catId   = cat ? cat.split("/")[0] : "all";
@@ -1245,10 +1311,25 @@ function Catalog({cat}) {
             <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(24px,3vw,40px)",fontWeight:400,color:T.text,lineHeight:1,fontStyle:"italic"}}>{title}</h1>
             <div style={{fontSize:12,color:T.textMuted,marginTop:5}}>{prods.length} products</div>
           </div>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..."
-            style={{background:T.ivoryAlt,border:`1px solid ${T.border}`,padding:"9px 13px",fontSize:12,outline:"none",color:T.text,width:200,fontFamily:"inherit",transition:"border-color .15s"}}
-            onFocus={e=>e.target.style.borderColor=T.emerald}
-            onBlur={e=>e.target.style.borderColor=T.border}/>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {isMobile && (
+              <button onClick={()=>setFilterOpen(true)}
+                style={{display:"flex",alignItems:"center",gap:5,padding:"9px 13px",
+                  background:T.ivoryAlt,border:`1px solid ${T.border}`,cursor:"pointer",
+                  fontSize:12,fontWeight:600,color:T.text,fontFamily:"inherit",flexShrink:0,
+                  letterSpacing:"0.04em"}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="2">
+                  <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/>
+                  <line x1="11" y1="18" x2="13" y2="18"/>
+                </svg>
+                Filter & Sort
+              </button>
+            )}
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search..."
+              style={{background:T.ivoryAlt,border:`1px solid ${T.border}`,padding:"9px 13px",fontSize:12,outline:"none",color:T.text,width:isMobile?120:200,fontFamily:"inherit",transition:"border-color .15s"}}
+              onFocus={e=>e.target.style.borderColor=T.emerald}
+              onBlur={e=>e.target.style.borderColor=T.border}/>
+          </div>
         </div>
         {!isConcern && (
           <div style={{display:"flex",gap:6,marginTop:12,flexWrap:"wrap"}}>
@@ -1265,9 +1346,9 @@ function Catalog({cat}) {
           </div>
         )}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"190px 1fr"}}>
-        {/* Sidebar */}
-        <div style={{background:T.white,borderRight:`1px solid ${T.border}`,padding:"22px 18px",position:"sticky",top:108,height:"calc(100vh - 108px)",overflowY:"auto",alignSelf:"start"}}>
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"190px 1fr"}}>
+        {/* Sidebar — desktop only */}
+        {!isMobile && <div style={{background:T.white,borderRight:`1px solid ${T.border}`,padding:"22px 18px",position:"sticky",top:108,height:"calc(100vh - 108px)",overflowY:"auto",alignSelf:"start"}}>
           <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:16,fontWeight:500,color:T.text,marginBottom:18,paddingBottom:10,borderBottom:`1px solid ${T.borderLight}`,fontStyle:"italic"}}>Refine</div>
           {[
             {label:"Sort By",key:"sort",opts:[["default","Relevance"],["popular","Most Popular"],["rating","Top Rated"],["p-asc","Price ↑"],["p-desc","Price ↓"]]},
@@ -1288,22 +1369,57 @@ function Catalog({cat}) {
               </div>
             </div>
           ))}
-        </div>
+        </div>}
         {/* Grid */}
-        <div style={{padding:"22px 22px"}}>
+        <div style={{padding:isMobile?"16px 14px":"22px 22px"}}>
           {prods.length===0 ? (
             <div style={{padding:"80px 0",textAlign:"center"}}>
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,color:T.textMuted,marginBottom:8,fontStyle:"italic"}}>No products found</div>
               <Btn v="subtle" sz="sm" onClick={()=>setFilters({sort:"default",sub:"all",price:"all"})}>Clear filters</Btn>
             </div>
           ) : (
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:14}}>
-              {prods.map(p=><PCard key={p.id} p={p}/>)}
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(auto-fill,minmax(190px,1fr))",gap:isMobile?10:14}}>
+              {prods.map(p=><PCard key={p.id} p={p} width={isMobile?undefined:undefined}/>)}
             </div>
           )}
         </div>
       </div>
-    
+
+      {/* Mobile filter drawer */}
+      {filterOpen && (
+        <>
+          <div onClick={()=>setFilterOpen(false)}
+            style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:1099,backdropFilter:"blur(2px)"}}/>
+          <div style={{position:"fixed",bottom:0,left:0,right:0,background:T.white,zIndex:1100,
+            borderRadius:"16px 16px 0 0",padding:"20px 0 40px",
+            boxShadow:"0 -8px 40px rgba(0,0,0,.18)",animation:"fadeUp .2s ease",maxHeight:"80vh",overflowY:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 20px 16px",borderBottom:`1px solid ${T.border}`}}>
+              <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:500,color:T.text,fontStyle:"italic"}}>Filter & Sort</span>
+              <button onClick={()=>setFilterOpen(false)}
+                style={{background:"none",border:"none",fontSize:22,color:T.textMuted,cursor:"pointer",fontFamily:"inherit",lineHeight:1}}>×</button>
+            </div>
+            <div style={{padding:"16px 20px"}}>
+              {[
+                {label:"Sort By",key:"sort",opts:[["default","Relevance"],["popular","Most Popular"],["rating","Top Rated"],["p-asc","Price ↑"],["p-desc","Price ↓"]]},
+                {label:"Price",key:"price",opts:[["all","All Prices"],["u500","Under ₹500"],["500-1500","₹500–₹1,500"],["1500+","₹1,500+"]]},
+              ].map(({label,key,opts})=>(
+                <div key={key} style={{marginBottom:22}}>
+                  <div style={{fontSize:9,fontWeight:700,color:T.textMuted,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:10}}>{label}</div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {opts.map(([v,l])=>(
+                      <button key={v} onClick={()=>setF(key,v)}
+                        style={{background:filters[key]===v?T.emerald:T.ivoryAlt,color:filters[key]===v?"#fff":T.textMid,border:`1px solid ${filters[key]===v?T.emerald:T.border}`,padding:"8px 14px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",transition:"all .12s"}}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <Btn onClick={()=>setFilterOpen(false)} style={{width:"100%",marginTop:8}}>Apply</Btn>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1311,27 +1427,28 @@ function Catalog({cat}) {
 // ─── PAGE: PRODUCT DETAIL ─────────────────────────────────────────────────────
 function ProductDetail({id,setPage}) {
   const {addCart,cart} = useCtx();
+  const isMobile = useWindowWidth() < 768;
   const p = ALL.find(x=>x.id===parseInt(id));
   if(!p) return <div style={{paddingTop:160,textAlign:"center",color:T.textMuted,fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontStyle:"italic"}}>Product not found</div>;
   const related = ALL.filter(x=>x.cat===p.cat&&x.id!==p.id).slice(0,8);
   const disc = p.mrp>p.price ? Math.round((1-p.price/p.mrp)*100) : 0;
   const inCart = cart[p.id]>0;
   return (
-    <div style={{paddingBottom:100,background:T.ivory}}>
-      <div style={{borderBottom:`1px solid ${T.border}`,padding:"12px 32px",fontSize:11,color:T.textMuted,background:T.white}}>
+    <div style={{paddingBottom:isMobile?100:100,background:T.ivory}}>
+      <div style={{borderBottom:`1px solid ${T.border}`,padding:isMobile?"10px 16px":"12px 32px",fontSize:11,color:T.textMuted,background:T.white}}>
         <span onClick={()=>setPage("home")} style={{cursor:"pointer"}} onMouseEnter={e=>e.target.style.color=T.emerald} onMouseLeave={e=>e.target.style.color=T.textMuted}>Home</span>
         {" / "}
         <span onClick={()=>setPage(p.cat)} style={{cursor:"pointer",textTransform:"capitalize"}} onMouseEnter={e=>e.target.style.color=T.emerald} onMouseLeave={e=>e.target.style.color=T.textMuted}>{p.cat}</span>
-        {" / "}{p.name}
+        {!isMobile && <>{" / "}{p.name}</>}
       </div>
-      <div style={{maxWidth:1100,margin:"0 auto",padding:"36px 32px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:56,alignItems:"start"}}>
-        <div style={{background:p.bg,aspectRatio:"1/1",display:"flex",alignItems:"center",justifyContent:"center",position:"sticky",top:120,border:`1px solid ${T.border}`}}>
+      <div style={{maxWidth:1100,margin:"0 auto",padding:isMobile?"0":"36px 32px",display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:isMobile?0:56,alignItems:"start"}}>
+        <div style={{background:p.bg,aspectRatio:"1/1",display:"flex",alignItems:"center",justifyContent:"center",position:isMobile?"relative":"sticky",top:isMobile?undefined:120,border:`1px solid ${T.border}`,maxHeight:isMobile?260:undefined,overflow:"hidden"}}>
           <div style={{textAlign:"center"}}>
             <div style={{fontSize:10,color:"rgba(0,0,0,.22)",fontWeight:700,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:14}}>{p.brand}</div>
             <div style={{width:110,height:150,background:"rgba(255,255,255,.6)",margin:"0 auto",border:"1px solid rgba(255,255,255,.8)",borderRadius:2}}/>
           </div>
         </div>
-        <div>
+        <div style={{padding:isMobile?"20px 16px 0":undefined}}>
           <div style={{fontSize:9,fontWeight:700,color:T.gold,letterSpacing:"0.14em",textTransform:"uppercase",marginBottom:10}}>{p.brand} - {p.sub}</div>
           <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(20px,2.5vw,30px)",fontWeight:400,lineHeight:1.2,marginBottom:14,color:T.text}}>{p.name}</h1>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
@@ -1343,11 +1460,13 @@ function ProductDetail({id,setPage}) {
             <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:30,fontWeight:600,color:T.text}}>Rs.{p.price.toLocaleString()}</span>
             {p.mrp>p.price && <><span style={{fontSize:14,color:T.textMuted,textDecoration:"line-through"}}>Rs.{p.mrp}</span><span style={{fontSize:12,color:T.red,fontWeight:700}}>{disc}% OFF</span></>}
           </div>
-          <div style={{display:"flex",gap:10,marginBottom:24}}>
-            <Btn sz="lg" v={inCart?"subtle":"fill"} style={inCart?{border:`1.5px solid ${T.emerald}`,color:T.emerald}:{}} onClick={()=>addCart(p.id)}>
-              {inCart?"Added to Bag":"Add to Bag"}
-            </Btn>
-          </div>
+          {!isMobile && (
+            <div style={{display:"flex",gap:10,marginBottom:24}}>
+              <Btn sz="lg" v={inCart?"subtle":"fill"} style={inCart?{border:`1.5px solid ${T.emerald}`,color:T.emerald}:{}} onClick={()=>addCart(p.id)}>
+                {inCart?"Added to Bag":"Add to Bag"}
+              </Btn>
+            </div>
+          )}
           <div style={{borderTop:`1px solid ${T.borderLight}`,paddingTop:18,display:"flex",flexDirection:"column",gap:11}}>
             {[["Brand",p.brand],["Category",p.sub],["Concern",p.concern||"General"],["Rating",`${p.rating} (${p.reviews.toLocaleString()} reviews)`]].map(([k,v])=>(
               <div key={k} style={{display:"flex",gap:14,alignItems:"baseline"}}>
@@ -1359,8 +1478,8 @@ function ProductDetail({id,setPage}) {
         </div>
       </div>
       {/* Reviews section */}
-      <div style={{maxWidth:1100,margin:"0 auto",padding:"0 32px 48px",borderTop:`1px solid ${T.borderLight}`}}>
-        <div style={{padding:"32px 0 20px",display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+      <div style={{maxWidth:1100,margin:"0 auto",padding:isMobile?"0 16px 48px":"0 32px 48px",borderTop:`1px solid ${T.borderLight}`}}>
+        <div style={{padding:"32px 0 20px",display:"flex",justifyContent:"space-between",alignItems:"flex-end",flexWrap:"wrap",gap:8}}>
           <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:400,color:T.text,fontStyle:"italic"}}>Customer Reviews</h2>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <Stars r={p.rating} n={p.reviews}/>
@@ -1390,13 +1509,31 @@ function ProductDetail({id,setPage}) {
         </div>
       </div>
       {related.length>0 && (
-        <div style={{maxWidth:1100,margin:"0 auto",padding:"0 32px 48px",borderTop:`1px solid ${T.borderLight}`}}>
+        <div style={{maxWidth:1100,margin:"0 auto",padding:isMobile?"0 16px 48px":"0 32px 48px",borderTop:`1px solid ${T.borderLight}`}}>
           <div style={{padding:"32px 0 20px"}}>
             <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:400,color:T.text,fontStyle:"italic"}}>Related Products</h2>
           </div>
           <div className="hscroll">
-            {related.map(rp=><PCard key={rp.id} p={rp} width={190}/>)}
+            {related.map(rp=><PCard key={rp.id} p={rp} width={isMobile?160:190}/>)}
           </div>
+        </div>
+      )}
+
+      {/* Mobile sticky Add-to-Bag bar */}
+      {isMobile && (
+        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:600,
+          background:T.white,borderTop:`1px solid ${T.border}`,
+          padding:"12px 16px",display:"flex",gap:12,alignItems:"center",
+          boxShadow:"0 -4px 20px rgba(27,67,50,.1)"}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:10,color:T.textMuted,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
+            <div style={{fontSize:18,fontWeight:700,color:T.text,letterSpacing:"-0.01em"}}>₹{p.price.toLocaleString()}</div>
+          </div>
+          <Btn sz="lg" v={inCart?"subtle":"fill"}
+            style={inCart?{border:`1.5px solid ${T.emerald}`,color:T.emerald,flexShrink:0}:{flexShrink:0}}
+            onClick={()=>addCart(p.id)}>
+            {inCart?"✓ Added to Bag":"Add to Bag"}
+          </Btn>
         </div>
       )}
     </div>
