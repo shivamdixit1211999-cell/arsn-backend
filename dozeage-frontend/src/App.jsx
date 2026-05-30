@@ -2709,6 +2709,9 @@ function CheckoutPage({setPage}) {
   const isMobile = useWindowWidth() < 768;
   const [step,setStep] = useState("summary");
   const [addr,setAddr] = useState({name:profile?.name||user?.name||"",phone:profile?.phone||user?.phone||"",line1:"",line2:"",city:"",state:"",pin:""});
+  useEffect(()=>{
+    if(user) setAddr(p=>({...p,name:p.name||user.name||"",phone:p.phone||user.phone||""}));
+  },[user]);
   const [coupon,setCoupon] = useState("");
   const [couponApplied,setCouponApplied] = useState(null);
   const [payMethod,setPayMethod] = useState("razorpay");
@@ -2894,7 +2897,7 @@ function OrderConfirmPage({setPage}) {
   const {profile,user} = useCtx();
   const orderNum = useMemo(()=>"DZ"+Date.now().toString().slice(-6),[]);
   const name = profile?.name||user?.name||"there";
-  const expectedDate = new Date(Date.now()+4*86400000).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long"});
+  const expectedDate = getDeliveryDate();
   return (
     <div style={{paddingBottom:120,background:T.ivory,minHeight:"100vh"}}>
       <div style={{maxWidth:580,margin:"0 auto",padding:"64px 32px",textAlign:"center"}}>
