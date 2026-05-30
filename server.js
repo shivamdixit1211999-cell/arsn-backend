@@ -1,11 +1,16 @@
 import express from "express";
 import cors from "cors";
+import crypto from "crypto";
 import rateLimit from "express-rate-limit";
+import Razorpay from "razorpay";
 import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// Capture raw body for Razorpay webhook signature verification
+app.use(express.json({
+  verify: (req, res, buf) => { req.rawBody = buf; }
+}));
 
 const supabase = createClient(
   process.env.SUPABASE_URL || "",
@@ -288,6 +293,71 @@ app.patch("/api/leads/:id", async (req, res) => {
   res.json(data);
 });
 
+// Generate Razorpay payment link and optionally send via WhatsApp
+app.post("/api/leads/:id/payment-link", async (req, res) => {
+  const tid = await getTenant(req, res);
+  if (!tid) return;
+
+  const { amount, description = "Payment", send_whatsapp = true } = req.body;
+  if (!amount || isNaN(amount) || Number(amount) <= 0) {
+    return res.status(400).json({ error: "Valid amount (in ₹) required" });
+  }
+
+  const { data: lead } = await supabase
+    .from("leads").select("id, phone, name").eq("id", req.params.id).eq("tenant_id", tid).single();
+  if (!lead) return res.status(404).json({ error: "Lead not found" });
+
+  const { data: tenant } = await supabase
+    .from("tenants")
+    .select("name, razorpay_key_id, razorpay_secret, whatsapp_phone_id, whatsapp_token")
+    .eq("id", tid).single();
+
+  if (!tenant?.razorpay_key_id || !tenant?.razorpay_secret) {
+    return res.status(400).json({ error: "Razorpay credentials not configured — add them in Settings" });
+  }
+
+  const rzp = new Razorpay({ key_id: tenant.razorpay_key_id, key_secret: tenant.razorpay_secret });
+
+  let paymentLink;
+  try {
+    paymentLink = await rzp.paymentLink.create({
+      amount: Math.round(Number(amount) * 100),
+      currency: "INR",
+      description,
+      customer: { name: lead.name || "", contact: `+${lead.phone}` },
+      notify: { sms: false, email: false },
+      reminder_enable: true,
+    });
+  } catch (e) {
+    console.error("Razorpay error:", e);
+    return res.status(502).json({ error: "Failed to create payment link" });
+  }
+
+  const { data: order } = await supabase
+    .from("orders")
+    .insert({
+      tenant_id: tid,
+      lead_id: lead.id,
+      amount: Math.round(Number(amount) * 100),
+      status: "pending",
+      razorpay_payment_link_id: paymentLink.id,
+      razorpay_short_url: paymentLink.short_url,
+      description,
+    })
+    .select().single();
+
+  if (send_whatsapp && tenant.whatsapp_phone_id && tenant.whatsapp_token) {
+    const msg = `Hi! Here's your payment link for *${description}*:\n\n${paymentLink.short_url}\n\nAmount: ₹${amount}`;
+    await fetch(`https://graph.facebook.com/v18.0/${tenant.whatsapp_phone_id}/messages`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${tenant.whatsapp_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ messaging_product: "whatsapp", to: lead.phone, type: "text", text: { body: msg } }),
+    }).catch(e => console.error("WhatsApp send error:", e));
+  }
+
+  res.json({ ok: true, payment_link: paymentLink.short_url, order });
+});
+
 // Analytics
 app.get("/api/analytics", async (req, res) => {
   const token = req.headers.authorization?.replace("Bearer ", "");
@@ -351,6 +421,36 @@ app.post("/api/products", async (req, res) => {
   const { name, description, price, category } = req.body;
   const { data } = await supabase.from("products").insert({ tenant_id: member.tenant_id, name, description, price, category }).select().single();
   res.json(data);
+});
+
+// Razorpay webhook — must be registered before the tenant-auth helpers
+app.post("/api/webhook/razorpay", async (req, res) => {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (secret) {
+    const sig = req.headers["x-razorpay-signature"];
+    const digest = crypto.createHmac("sha256", secret).update(req.rawBody).digest("hex");
+    if (sig !== digest) return res.status(400).json({ error: "Invalid signature" });
+  }
+
+  const event = req.body;
+  if (event.event === "payment_link.paid") {
+    const linkId = event.payload.payment_link?.entity?.id;
+    if (linkId) {
+      const { data: order } = await supabase
+        .from("orders")
+        .update({ status: "paid" })
+        .eq("razorpay_payment_link_id", linkId)
+        .select("id, lead_id")
+        .single();
+      if (order?.lead_id) {
+        await supabase.from("leads")
+          .update({ state: "converted", last_activity_at: new Date().toISOString() })
+          .eq("id", order.lead_id);
+      }
+    }
+  }
+
+  res.json({ ok: true });
 });
 
 // Conversations
