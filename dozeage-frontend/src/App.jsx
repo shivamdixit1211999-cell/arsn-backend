@@ -80,9 +80,9 @@ const ALL = [
 
 
 // Bundles
-ALL.push(mk(25,"Dozeage","Acne Starter Kit","Bundles","skin","acne",899,1247,"BUNDLE",1240,4.8,445,"#EEF6EE",["Salicylic Acid 2%","Niacinamide 10%","SPF 50"],"Complete acne routine: cleanser + serum + sunscreen. Save Rs.348."));
-ALL.push(mk(26,"Dozeage","Glow Edit Kit","Bundles","skin","glow",1099,1547,"BUNDLE",890,4.7,312,"#FBF8EE",["Alpha Arbutin 2%","Hyaluronic Acid","Vitamin C"],"4-week brightening system. Save Rs.448."));
-ALL.push(mk(27,"Dozeage","Hairfall Protocol Kit","Bundles","hair","hairfall",1199,1648,"BUNDLE",670,4.6,228,"#EDF5F8",["Redensyl 3%","Biotin 10000mcg","Caffeine 0.5%"],"90-day hairfall solution. Save Rs.449."));
+ALL.push(mk(25,"Dozeage","Acne Starter Kit","Bundles","skin","acne",899,1247,"BUNDLE",1240,4.8,445,"#EEF6EE",["Salicylic Acid 2%","Niacinamide 10%","SPF 50"],"Complete acne routine: cleanser + serum + sunscreen. Save ₹348."));
+ALL.push(mk(26,"Dozeage","Glow Edit Kit","Bundles","skin","glow",1099,1547,"BUNDLE",890,4.7,312,"#FBF8EE",["Alpha Arbutin 2%","Hyaluronic Acid","Vitamin C"],"4-week brightening system. Save ₹448."));
+ALL.push(mk(27,"Dozeage","Hairfall Protocol Kit","Bundles","hair","hairfall",1199,1648,"BUNDLE",670,4.6,228,"#EDF5F8",["Redensyl 3%","Biotin 10000mcg","Caffeine 0.5%"],"90-day hairfall solution. Save ₹449."));
 
 const CONCERNS = [
   {id:"acne",label:"Acne & Breakouts"},{id:"pigmentation",label:"Pigmentation"},
@@ -147,6 +147,14 @@ const MILESTONES = [
 ];
 
 const RX_PRODUCTS = [11,16]; // Drunk Elephant, SkinCeuticals — Rx-gated
+
+// Delivery date: +3 days Mon–Fri, skip weekends
+function getDeliveryDate() {
+  const d = new Date(); let added = 0;
+  while(added<3){ d.setDate(d.getDate()+1); if(d.getDay()!==0&&d.getDay()!==6) added++; }
+  return d.toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"});
+}
+const DELIVERY_DATE = getDeliveryDate(); // computed once at module load
 
 
 // ─── ATOMS ────────────────────────────────────────────────────────────────────
@@ -583,10 +591,13 @@ function Nav({page,setPage}) {
       </div>
 
       {/* Category nav — compresses on scroll */}
+      <div style={{position:"relative"}}>
+      {isMobile && <div style={{position:"absolute",right:0,top:0,bottom:0,width:36,
+        background:"linear-gradient(to right,transparent,"+T.ivory+")",pointerEvents:"none",zIndex:1}}/>}
       <div style={{
         background:T.ivory,
         borderBottom:`1px solid ${T.border}`,
-        padding:`0 32px`,
+        padding:`0 ${isMobile?"10px":"32px"}`,
         display:"flex",gap:0,overflowX:"auto",scrollbarWidth:"none",
         transition:"all .22s ease",
       }}>
@@ -622,6 +633,7 @@ function Nav({page,setPage}) {
             whiteSpace:"nowrap",letterSpacing:"0.06em",textTransform:"uppercase",flexShrink:0}}>
           B2B
         </div>
+      </div>
       </div>
 
       {/* Mega menu */}
@@ -783,7 +795,8 @@ function CartDrawer() {
                 color:T.textMuted,marginBottom:8,fontStyle:"italic"}}>
                 Your bag is empty
               </div>
-              <div style={{fontSize:12,color:T.textMuted}}>Add products to begin</div>
+              <div style={{fontSize:12,color:T.textMuted,marginBottom:20}}>Discover your skin's daily dose</div>
+              <Btn v="outline" onClick={()=>setCartOpen(false)}>Continue Shopping</Btn>
             </div>
           ) : items.map(p=>(
             <div key={p.id} style={{display:"flex",gap:13,padding:"14px 0",
@@ -822,9 +835,22 @@ function CartDrawer() {
               <span style={{fontSize:11,color:T.textMuted,letterSpacing:"0.08em",textTransform:"uppercase"}}>Subtotal</span>
               <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:600}}>₹{subtotal.toLocaleString()}</span>
             </div>
-            <Btn fw sz="lg" onClick={()=>{setCartOpen(false);drawerSetPage("checkout");}}>Proceed to Checkout -&gt;</Btn>
-            <div style={{textAlign:"center",fontSize:11,color:T.textMuted,marginTop:8}}>
-              Free delivery &middot; Easy returns &middot; 100% authentic
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12,fontSize:12,color:T.emeraldMid,fontWeight:600}}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.emeraldMid} strokeWidth="2">
+                <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+              Get it by <strong style={{marginLeft:3}}>{DELIVERY_DATE}</strong>
+            </div>
+            <Btn fw sz="lg" onClick={()=>{setCartOpen(false);drawerSetPage("checkout");}}>Proceed to Checkout →</Btn>
+            <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:10}}>
+              <button onClick={()=>setCartOpen(false)}
+                style={{background:"none",border:"none",fontSize:11,color:T.textMuted,cursor:"pointer",
+                  fontFamily:"inherit",letterSpacing:"0.04em",textDecoration:"underline",padding:0}}>
+                Continue Shopping
+              </button>
+              <span style={{color:T.borderLight}}>·</span>
+              <span style={{fontSize:11,color:T.textMuted}}>Free delivery above ₹499</span>
             </div>
           </div>
         )}
@@ -1428,7 +1454,7 @@ function Catalog({cat}) {
 
 // ─── PAGE: PRODUCT DETAIL ─────────────────────────────────────────────────────
 function ProductDetail({id,setPage}) {
-  const {addCart,cart} = useCtx();
+  const {addCart,cart,toggleWish,wishlist} = useCtx();
   const isMobile = useWindowWidth() < 768;
   const p = ALL.find(x=>x.id===parseInt(id));
   if(!p) return <div style={{paddingTop:160,textAlign:"center",color:T.textMuted,fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontStyle:"italic"}}>Product not found</div>;
@@ -1459,14 +1485,36 @@ function ProductDetail({id,setPage}) {
           </div>
           {p.badge && <div style={{marginBottom:16}}><BadgeChip type={p.badge}/></div>}
           <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:26}}>
-            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:30,fontWeight:600,color:T.text}}>Rs.{p.price.toLocaleString()}</span>
-            {p.mrp>p.price && <><span style={{fontSize:14,color:T.textMuted,textDecoration:"line-through"}}>Rs.{p.mrp}</span><span style={{fontSize:12,color:T.red,fontWeight:700}}>{disc}% OFF</span></>}
+            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:30,fontWeight:600,color:T.text}}>₹{p.price.toLocaleString()}</span>
+            {p.mrp>p.price && <><span style={{fontSize:14,color:T.textMuted,textDecoration:"line-through"}}>₹{p.mrp}</span><span style={{fontSize:12,color:T.red,fontWeight:700}}>{disc}% OFF</span></>}
           </div>
           {!isMobile && (
-            <div style={{display:"flex",gap:10,marginBottom:24}}>
+            <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
               <Btn sz="lg" v={inCart?"subtle":"fill"} style={inCart?{border:`1.5px solid ${T.emerald}`,color:T.emerald}:{}} onClick={()=>addCart(p.id)}>
                 {inCart?"Added to Bag":"Add to Bag"}
               </Btn>
+              <button onClick={e=>{e.stopPropagation();toggleWish(p.id);}}
+                style={{padding:"14px 16px",background:wishlist&&wishlist.includes(p.id)?T.redBg:T.ivoryAlt,
+                  border:`1.5px solid ${wishlist&&wishlist.includes(p.id)?"#C0392B":T.border}`,
+                  cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit",
+                  fontSize:11,fontWeight:600,color:wishlist&&wishlist.includes(p.id)?"#C0392B":T.textMid,
+                  letterSpacing:"0.04em",textTransform:"uppercase",transition:"all .15s"}}>
+                <svg width="13" height="13" viewBox="0 0 24 24"
+                  fill={wishlist&&wishlist.includes(p.id)?"#C0392B":"none"} stroke="currentColor" strokeWidth="2">
+                  <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                </svg>
+                {wishlist&&wishlist.includes(p.id)?"Saved":"Wishlist"}
+              </button>
+            </div>
+          )}
+          {!isMobile && (
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:24,fontSize:12,color:T.emeraldMid,fontWeight:600}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.emeraldMid} strokeWidth="2">
+                <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+              Get it by <strong style={{color:T.emerald,marginLeft:3}}>{DELIVERY_DATE}</strong>
+              <span style={{color:T.textMuted,fontWeight:400,marginLeft:4}}>· Order before 5PM</span>
             </div>
           )}
           <div style={{borderTop:`1px solid ${T.borderLight}`,paddingTop:18,display:"flex",flexDirection:"column",gap:11}}>
@@ -1525,11 +1573,12 @@ function ProductDetail({id,setPage}) {
       {isMobile && (
         <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:600,
           background:T.white,borderTop:`1px solid ${T.border}`,
-          padding:"12px 16px",display:"flex",gap:12,alignItems:"center",
+          padding:"10px 16px 12px",display:"flex",gap:12,alignItems:"center",
           boxShadow:"0 -4px 20px rgba(27,67,50,.1)"}}>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:10,color:T.textMuted,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{p.name}</div>
-            <div style={{fontSize:18,fontWeight:700,color:T.text,letterSpacing:"-0.01em"}}>₹{p.price.toLocaleString()}</div>
+            <div style={{fontSize:16,fontWeight:700,color:T.text,letterSpacing:"-0.01em"}}>₹{p.price.toLocaleString()}</div>
+            <div style={{fontSize:10,color:T.emeraldMid,fontWeight:600}}>By {DELIVERY_DATE}</div>
           </div>
           <Btn sz="lg" v={inCart?"subtle":"fill"}
             style={inCart?{border:`1.5px solid ${T.emerald}`,color:T.emerald,flexShrink:0}:{flexShrink:0}}
@@ -1549,8 +1598,8 @@ const QUIZ_CONCERN_MAP = {
   "Dullness":"glow","Hairfall":"hairfall",
 };
 const QUIZ_BUDGET_MAP = {
-  "Under Rs.500":500,"Rs.500-Rs.1,500":1500,
-  "Rs.1,500-Rs.5,000":5000,"No limit":Infinity,
+  "Under ₹500":500,"₹500–₹1,500":1500,
+  "₹1,500–₹5,000":5000,"No limit":Infinity,
 };
 
 function Quiz({setPage}) {
@@ -1562,7 +1611,7 @@ function Quiz({setPage}) {
     {q:"What is your primary concern?",     opts:["Acne and Oiliness","Dryness and Dehydration","Pigmentation","Ageing and Fine Lines","Dullness","Hairfall"]},
     {q:"How would you describe your skin?", opts:["Oily","Dry","Combination","Sensitive","Normal"]},
     {q:"Steps per routine?",                opts:["2-3 (minimal)","4-5 (standard)","6+ (full ritual)"]},
-    {q:"Monthly budget for skin?",          opts:["Under Rs.500","Rs.500-Rs.1,500","Rs.1,500-Rs.5,000","No limit"]},
+    {q:"Monthly budget for skin?",          opts:["Under ₹500","₹500–₹1,500","₹1,500–₹5,000","No limit"]},
   ];
   const answer = opt => {
     const next = [...answers, opt];
@@ -2507,7 +2556,7 @@ function ConsultPage({setPage}) {
 const FOOTER_NAV = {
   "Skincare":"skin","Hair":"hair","Wellness":"wellness","Vitamins":"wellness",
   "Makeup":"makeup","Men":"mens","Brands":"brands","Skin Quiz":"quiz",
-  "Shop by Concern":"concern/acne","Bestsellers":"all","Under Rs.500":"all",
+  "Shop by Concern":"concern/acne","Bestsellers":"all","Under ₹500":"all",
   "New Arrivals":"all","About":"home","B2B / Wholesale":"b2b",
   "Track Order":"home","Returns":"home","Contact":"home",
 };
@@ -2523,7 +2572,7 @@ function Footer({setPage}) {
         </div>
         {[
           {h:"Shop",l:["Skincare","Hair","Wellness","Vitamins","Makeup","Men","Brands"]},
-          {h:"Discover",l:["Skin Quiz","Shop by Concern","Bestsellers","Under Rs.500","New Arrivals"]},
+          {h:"Discover",l:["Skin Quiz","Shop by Concern","Bestsellers","Under ₹500","New Arrivals"]},
           {h:"Company",l:["About","B2B / Wholesale","Track Order","Returns","Contact"]},
         ].map(({h,l})=>(
           <div key={h}>
@@ -2662,6 +2711,7 @@ function CheckoutPage({setPage}) {
   const [addr,setAddr] = useState({name:profile?.name||user?.name||"",phone:profile?.phone||user?.phone||"",line1:"",line2:"",city:"",state:"",pin:""});
   const [coupon,setCoupon] = useState("");
   const [couponApplied,setCouponApplied] = useState(null);
+  const [payMethod,setPayMethod] = useState("razorpay");
   const COUPONS = {WELCOME10:{pct:10,label:"10% off — Welcome offer"},DERM20:{pct:20,label:"20% off — Derm Special"},DOZEAGE:{pct:15,label:"15% off"}};
   const applyCoupon = () => {
     const c = COUPONS[coupon.trim().toUpperCase()];
@@ -2772,18 +2822,27 @@ function CheckoutPage({setPage}) {
             <div style={{background:T.white,border:`1px solid ${T.border}`,padding:"24px"}}>
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:400,color:T.text,fontStyle:"italic",marginBottom:18}}>Payment Method</div>
               <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
-                {[["razorpay","Pay via Razorpay","UPI · Cards · NetBanking · Wallets","Recommended"],["cod","Cash on Delivery","Pay when your order arrives","+₹30 handling"]].map(([id,label,sub,note],i)=>(
-                  <div key={id} style={{background:i===0?T.emeraldBg:T.ivoryAlt,border:`1.5px solid ${i===0?T.emerald:T.border}`,padding:"16px",display:"flex",gap:12,alignItems:"center",cursor:"pointer"}}>
-                    <div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${i===0?T.emerald:T.border}`,background:i===0?T.emerald:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {i===0&&<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>}
+                {[
+                ["razorpay","Pay via Razorpay","UPI · Cards · NetBanking · Wallets"],
+                ["cod","Cash on Delivery","No payment now · Pay when delivered"],
+              ].map(([id,label,sub])=>{
+                const sel = payMethod===id;
+                return (
+                  <div key={id} onClick={()=>setPayMethod(id)}
+                    style={{background:sel?T.emeraldBg:T.ivoryAlt,border:`1.5px solid ${sel?T.emerald:T.border}`,
+                      padding:"16px",display:"flex",gap:12,alignItems:"center",cursor:"pointer",transition:"all .15s"}}>
+                    <div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${sel?T.emerald:T.border}`,
+                      background:sel?T.emerald:"transparent",flexShrink:0,display:"flex",
+                      alignItems:"center",justifyContent:"center",transition:"all .15s"}}>
+                      {sel&&<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>}
                     </div>
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:700,color:T.text}}>{label}</div>
                       <div style={{fontSize:11,color:T.textMuted}}>{sub}</div>
                     </div>
-                    <span style={{fontSize:10,fontWeight:700,color:i===0?T.emerald:T.textMuted}}>{note}</span>
                   </div>
-                ))}
+                );
+              })}
               </div>
               <div style={{background:T.emeraldBg,border:`1px solid ${T.emeraldLight}44`,padding:"11px 14px",marginBottom:18,display:"flex",alignItems:"center",gap:8}}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.emerald} strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
