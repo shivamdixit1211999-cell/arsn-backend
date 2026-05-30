@@ -415,18 +415,20 @@ function Nav({page,setPage}) {
         overflow: "hidden",
         transition:"height .25s ease",
       }}>
-        <div style={{padding:"6px 32px",display:"flex",justifyContent:"space-between",
+        <div style={{padding:`6px ${isMobile?"14px":"32px"}`,display:"flex",justifyContent:"space-between",
           alignItems:"center",fontSize:11,color:"rgba(255,255,255,.65)",letterSpacing:"0.05em"}}>
-          <span style={{fontWeight:400}}>Free delivery above ₹499 &middot; Pan India</span>
-          <div style={{display:"flex",gap:20}}>
-            <span onClick={()=>setPage("b2b")}
-              style={{cursor:"pointer",transition:"color .15s",fontWeight:500}}
-              onMouseEnter={e=>e.target.style.color="#fff"}
-              onMouseLeave={e=>e.target.style.color="rgba(255,255,255,.65)"}>
-              B2B / Wholesale
-            </span>
+          <span style={{fontWeight:400,whiteSpace:"nowrap"}}>Free delivery above ₹499 &middot; Pan India</span>
+          <div style={{display:"flex",gap:16,alignItems:"center"}}>
+            {!isMobile && (
+              <span onClick={()=>setPage("b2b")}
+                style={{cursor:"pointer",transition:"color .15s",fontWeight:500,whiteSpace:"nowrap"}}
+                onMouseEnter={e=>e.target.style.color="#fff"}
+                onMouseLeave={e=>e.target.style.color="rgba(255,255,255,.65)"}>
+                B2B / Wholesale
+              </span>
+            )}
             <span onClick={()=>user?setPage("account"):setAuthOpen(true)}
-              style={{cursor:"pointer",transition:"color .15s",fontWeight:600,color:user?"#fff":"rgba(255,255,255,.65)"}}
+              style={{cursor:"pointer",transition:"color .15s",fontWeight:600,color:user?"#fff":"rgba(255,255,255,.65)",whiteSpace:"nowrap"}}
               onMouseEnter={e=>e.target.style.color="#fff"}
               onMouseLeave={e=>e.target.style.color=user?"#fff":"rgba(255,255,255,.65)"}>
               {user?`Hi, ${user.name.split(" ")[0]}`:"Sign In"}
@@ -439,7 +441,7 @@ function Nav({page,setPage}) {
       <div style={{
         background:T.ivory,
         borderBottom:`1px solid ${scrolled?T.border:"transparent"}`,
-        padding:`0 32px`,
+        padding:`0 ${isMobile?"12px":"32px"}`,
         height: scrolled ? 48 : 58,
         display:"flex",alignItems:"center",gap:16,
         transition:"all .22s ease",
@@ -2655,8 +2657,17 @@ function AccountPage({setPage}) {
 // ─── CHECKOUT PAGE ────────────────────────────────────────────────────────────
 function CheckoutPage({setPage}) {
   const {cart,setCart,profile,user,showNotif} = useCtx();
+  const isMobile = useWindowWidth() < 768;
   const [step,setStep] = useState("summary");
   const [addr,setAddr] = useState({name:profile?.name||user?.name||"",phone:profile?.phone||user?.phone||"",line1:"",line2:"",city:"",state:"",pin:""});
+  const [coupon,setCoupon] = useState("");
+  const [couponApplied,setCouponApplied] = useState(null);
+  const COUPONS = {WELCOME10:{pct:10,label:"10% off — Welcome offer"},DERM20:{pct:20,label:"20% off — Derm Special"},DOZEAGE:{pct:15,label:"15% off"}};
+  const applyCoupon = () => {
+    const c = COUPONS[coupon.trim().toUpperCase()];
+    if(c){ setCouponApplied(c); showNotif({title:"Coupon applied!",msg:c.label}); }
+    else showNotif({title:"Invalid code",msg:"Try WELCOME10, DERM20, or DOZEAGE"});
+  };
   const items = ALL.filter(p=>cart[p.id]>0);
   const subtotal = items.reduce((s,p)=>s+p.price*cart[p.id],0);
   const delivery = subtotal>=499?0:49;
@@ -2666,6 +2677,8 @@ function CheckoutPage({setPage}) {
   const inp = {background:T.white,border:`1.5px solid ${T.border}`,padding:"11px 13px",fontSize:13,outline:"none",color:T.text,fontFamily:"inherit",width:"100%",transition:"border-color .15s"};
   const STEPS = ["summary","address","payment"];
   const stepLabel = {summary:"Order Summary",address:"Delivery Address",payment:"Payment"};
+  const discount = couponApplied ? Math.round(subtotal*couponApplied.pct/100) : 0;
+  const total2 = subtotal + delivery - discount;
   const placeOrder = () => { try{localStorage.removeItem("dz_cart");}catch(_){} setCart({}); setPage("order-confirm"); };
 
   if(items.length===0&&step==="summary") return (
@@ -2678,14 +2691,14 @@ function CheckoutPage({setPage}) {
   return (
     <div style={{paddingBottom:120,background:T.ivory,minHeight:"100vh"}}>
       {/* Promo banner */}
-      <div style={{background:T.emerald,padding:"10px 32px",textAlign:"center"}}>
+      <div style={{background:T.emerald,padding:`10px ${isMobile?"14px":"32px"}`,textAlign:"center"}}>
         <span style={{fontSize:12,fontWeight:600,color:"#fff",letterSpacing:"0.04em"}}>
           {delivery===0?"✓ Free delivery on this order · ":"Add ₹"+(499-subtotal)+" more for free delivery · "}
           {savings>0?`You're saving ₹${savings.toLocaleString()} on this order`:"100% Authentic Products"}
         </span>
       </div>
       {/* Step indicator */}
-      <div style={{background:T.white,borderBottom:`1px solid ${T.border}`,padding:"14px 32px"}}>
+      <div style={{background:T.white,borderBottom:`1px solid ${T.border}`,padding:`14px ${isMobile?"14px":"32px"}`}}>
         <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center"}}>
           {STEPS.map((s,i)=>(
             <div key={s} style={{display:"flex",alignItems:"center",flex:i<STEPS.length-1?1:undefined}}>
@@ -2699,7 +2712,7 @@ function CheckoutPage({setPage}) {
           ))}
         </div>
       </div>
-      <div style={{maxWidth:860,margin:"0 auto",padding:"28px 32px",display:"grid",gridTemplateColumns:"1fr 300px",gap:24,alignItems:"start"}}>
+      <div style={{maxWidth:860,margin:"0 auto",padding:isMobile?"16px 14px":"28px 32px",display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 300px",gap:isMobile?16:24,alignItems:"start"}}>
         <div>
           {/* Summary */}
           {step==="summary"&&(
@@ -2722,7 +2735,21 @@ function CheckoutPage({setPage}) {
                   </div>
                 </div>
               ))}
-              <div style={{marginTop:18}}><Btn fw sz="lg" onClick={()=>setStep("address")}>Continue to Delivery →</Btn></div>
+              {/* Coupon code */}
+              <div style={{marginTop:18,display:"flex",gap:8}}>
+                <input value={coupon} onChange={e=>setCoupon(e.target.value.toUpperCase())}
+                  onKeyDown={e=>e.key==="Enter"&&applyCoupon()}
+                  placeholder="Coupon code (e.g. WELCOME10)"
+                  style={{flex:1,background:couponApplied?T.emeraldBg:T.white,border:`1.5px solid ${couponApplied?T.emerald:T.border}`,padding:"10px 13px",fontSize:12,outline:"none",color:T.text,fontFamily:"inherit",transition:"border-color .15s",letterSpacing:"0.05em"}}
+                  onFocus={e=>e.target.style.borderColor=T.emerald}
+                  onBlur={e=>e.target.style.borderColor=couponApplied?T.emerald:T.border}/>
+                <Btn v={couponApplied?"subtle":"outline"} sz="sm" onClick={applyCoupon}
+                  style={couponApplied?{border:`1.5px solid ${T.emerald}`,color:T.emerald}:{}}>
+                  {couponApplied?"✓ Applied":"Apply"}
+                </Btn>
+              </div>
+              {couponApplied&&<div style={{fontSize:11,color:T.emeraldMid,fontWeight:600,marginTop:6}}>{couponApplied.label}</div>}
+              <div style={{marginTop:14}}><Btn fw sz="lg" onClick={()=>setStep("address")}>Continue to Delivery →</Btn></div>
             </div>
           )}
           {/* Address */}
@@ -2762,7 +2789,7 @@ function CheckoutPage({setPage}) {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.emerald} strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 <span style={{fontSize:11,color:T.emeraldMid,fontWeight:600}}>100% secure · SSL encrypted · Powered by Razorpay</span>
               </div>
-              <Btn fw sz="lg" onClick={placeOrder}>Pay ₹{total.toLocaleString()} →</Btn>
+              <Btn fw sz="lg" onClick={placeOrder}>Pay ₹{total2.toLocaleString()} →</Btn>
             </div>
           )}
         </div>
@@ -2781,17 +2808,22 @@ function CheckoutPage({setPage}) {
               </div>
             ))}
           </div>
-          {[["Subtotal",`₹${subtotal.toLocaleString()}`],["Delivery",delivery===0?"FREE ✓":`₹${delivery}`],savings>0?["You save",`-₹${savings.toLocaleString()}`]:null].filter(Boolean).map(([l,v])=>(
+          {[
+            ["Subtotal",`₹${subtotal.toLocaleString()}`],
+            ["Delivery",delivery===0?"FREE ✓":`₹${delivery}`],
+            savings>0?["Product savings",`-₹${savings.toLocaleString()}`]:null,
+            couponApplied?["Coupon",`-₹${discount.toLocaleString()}`]:null,
+          ].filter(Boolean).map(([l,v])=>(
             <div key={l} style={{display:"flex",justifyContent:"space-between",marginBottom:7}}>
               <span style={{fontSize:12,color:T.textMuted}}>{l}</span>
-              <span style={{fontSize:12,fontWeight:600,color:l==="You save"?T.emeraldMid:l==="Delivery"&&delivery===0?T.emeraldMid:T.text}}>{v}</span>
+              <span style={{fontSize:12,fontWeight:600,color:(l==="Product savings"||l==="Coupon")?T.emeraldMid:l==="Delivery"&&delivery===0?T.emeraldMid:T.text}}>{v}</span>
             </div>
           ))}
           <div style={{display:"flex",justifyContent:"space-between",marginTop:12,paddingTop:12,borderTop:`1px solid ${T.border}`}}>
             <span style={{fontSize:13,fontWeight:700}}>Total</span>
-            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:600}}>₹{total.toLocaleString()}</span>
+            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:600}}>₹{total2.toLocaleString()}</span>
           </div>
-          {savings>0&&<div style={{background:T.emeraldBg,padding:"8px 10px",marginTop:10,fontSize:11,color:T.emeraldMid,fontWeight:700,textAlign:"center"}}>You save ₹{savings.toLocaleString()} 🎉</div>}
+          {(savings+discount)>0&&<div style={{background:T.emeraldBg,padding:"8px 10px",marginTop:10,fontSize:11,color:T.emeraldMid,fontWeight:700,textAlign:"center"}}>You save ₹{(savings+discount).toLocaleString()} 🎉</div>}
         </div>
       </div>
     </div>
