@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { createClient } from "@supabase/supabase-js";
 
 const app = express();
@@ -11,8 +12,144 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY || ""
 );
 
-// Health check
-app.get("/", (req, res) => res.json({ status: "ARSN API running" }));
+const GA4_ID = process.env.GA4_MEASUREMENT_ID || "";
+const PIXEL_ID = process.env.META_PIXEL_ID || "";
+const CLARITY_ID = process.env.CLARITY_PROJECT_ID || "";
+
+function buildHomepage() {
+  const ga4Script = GA4_ID ? `
+    <!-- Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=${GA4_ID}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '${GA4_ID}');
+    </script>` : "";
+
+  const metaPixelScript = PIXEL_ID ? `
+    <!-- Meta Pixel -->
+    <script>
+      !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+      n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+      document,'script','https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '${PIXEL_ID}');
+      fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+      src="https://www.facebook.com/tr?id=${PIXEL_ID}&ev=PageView&noscript=1"/></noscript>` : "";
+
+  const clarityScript = CLARITY_ID ? `
+    <!-- Microsoft Clarity -->
+    <script type="text/javascript">
+      (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y)})(window,
+      document,"clarity","script","${CLARITY_ID}");
+    </script>` : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ARSN — AI-Powered Sales on WhatsApp</title>
+  ${ga4Script}
+  ${metaPixelScript}
+  ${clarityScript}
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0a0a;color:#f5f5f5;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}
+    .hero{text-align:center;max-width:560px}
+    h1{font-size:2.4rem;font-weight:700;line-height:1.2;margin-bottom:1rem}
+    h1 span{color:#25d366}
+    p{color:#aaa;font-size:1.1rem;line-height:1.6;margin-bottom:2rem}
+    form{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+    input[type=email]{flex:1;min-width:220px;padding:.75rem 1rem;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:#f5f5f5;font-size:1rem;outline:none}
+    input[type=email]:focus{border-color:#25d366}
+    button{padding:.75rem 1.5rem;border-radius:8px;border:none;background:#25d366;color:#000;font-weight:600;font-size:1rem;cursor:pointer;white-space:nowrap}
+    button:hover{background:#1ebe5a}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .msg{margin-top:1rem;font-size:.9rem;min-height:1.2em}
+    .msg.ok{color:#25d366}
+    .msg.err{color:#f66}
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <h1>Close more deals on <span>WhatsApp</span> — automatically.</h1>
+    <p>ARSN puts an AI sales agent in your WhatsApp inbox. It qualifies leads, answers questions, and pushes toward booking — 24/7, in any language.</p>
+    <form id="wf">
+      <input type="email" id="email" placeholder="Enter your email" required autocomplete="email"/>
+      <button type="submit" id="btn">Join the waitlist</button>
+    </form>
+    <p class="msg" id="msg"></p>
+  </div>
+  <script>
+    document.getElementById('wf').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn');
+      const msg = document.getElementById('msg');
+      const email = document.getElementById('email').value.trim();
+      btn.disabled = true;
+      btn.textContent = 'Joining…';
+      msg.className = 'msg';
+      msg.textContent = '';
+      try {
+        const r = await fetch('/api/waitlist', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({email})
+        });
+        const d = await r.json();
+        if (r.ok) {
+          msg.className = 'msg ok';
+          msg.textContent = "You're on the list! We'll be in touch soon.";
+          document.getElementById('email').value = '';
+          if (typeof fbq !== 'undefined') fbq('track', 'Lead');
+          if (typeof gtag !== 'undefined') gtag('event', 'sign_up', {method: 'waitlist'});
+        } else {
+          msg.className = 'msg err';
+          msg.textContent = d.error || 'Something went wrong. Try again.';
+        }
+      } catch {
+        msg.className = 'msg err';
+        msg.textContent = 'Network error. Try again.';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Join the waitlist';
+    });
+  </script>
+</body>
+</html>`;
+}
+
+// Landing page
+app.get("/", (req, res) => {
+  res.setHeader("Content-Type", "text/html");
+  res.send(buildHomepage());
+});
+
+// Health check (for monitoring / uptime probes)
+app.get("/api/health", (req, res) => res.json({ status: "ARSN API running" }));
+
+// Email waitlist
+const waitlistLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, standardHeaders: true, legacyHeaders: false });
+app.post("/api/waitlist", waitlistLimiter, async (req, res) => {
+  const { email } = req.body || {};
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "Valid email required" });
+  }
+  const { error } = await supabase.from("waitlist").insert({ email: email.toLowerCase().trim() });
+  if (error) {
+    if (error.code === "23505") return res.status(409).json({ error: "Already on the list!" });
+    console.error("Waitlist insert error:", error);
+    return res.status(500).json({ error: "Could not save email" });
+  }
+  res.json({ ok: true });
+});
 
 // WhatsApp webhook verification
 app.get("/api/webhook/whatsapp", (req, res) => {
