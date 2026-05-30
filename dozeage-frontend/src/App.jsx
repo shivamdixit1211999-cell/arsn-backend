@@ -46,6 +46,8 @@ button,input,select,textarea{font-family:inherit;}
 @keyframes pulse{0%,100%{opacity:.6;}50%{opacity:1;}}
 @keyframes spin{to{transform:rotate(360deg);}}
 @keyframes marquee{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+:root{--bot-nav:56px;}
+@supports(padding-bottom:env(safe-area-inset-bottom)){:root{--bot-nav:calc(56px + env(safe-area-inset-bottom));}}
 `;
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
@@ -88,11 +90,16 @@ ALL.push(mk(26,"Dozeage","Glow Edit Kit","Bundles","skin","glow",1099,1547,"BUND
 ALL.push(mk(27,"Dozeage","Hairfall Protocol Kit","Bundles","hair","hairfall",1199,1648,"BUNDLE",670,4.6,228,"#EDF5F8",["Redensyl 3%","Biotin 10000mcg","Caffeine 0.5%"],"90-day hairfall solution. Save ₹449."));
 
 const CONCERNS = [
-  {id:"acne",label:"Acne & Breakouts"},{id:"pigmentation",label:"Pigmentation"},
-  {id:"ageing",label:"Anti-Ageing"},{id:"hydration",label:"Dry & Dehydrated"},
-  {id:"hairfall",label:"Hairfall & Thinning"},{id:"dandruff",label:"Dandruff & Scalp"},
-  {id:"glow",label:"Glow & Radiance"},{id:"sensitivity",label:"Sensitive Skin"},
-  {id:"pores",label:"Open Pores"},{id:"energy",label:"Energy & Immunity"},
+  {id:"acne",       label:"Acne & Breakouts",    icon:"◎", accent:"#FEF2F2", border:"#FECACA"},
+  {id:"pigmentation",label:"Pigmentation",        icon:"◑", accent:"#F5F3FF", border:"#DDD6FE"},
+  {id:"ageing",     label:"Anti-Ageing",          icon:"◈", accent:"#FFF7ED", border:"#FED7AA"},
+  {id:"hydration",  label:"Dry & Dehydrated",     icon:"◉", accent:"#EFF6FF", border:"#BFDBFE"},
+  {id:"hairfall",   label:"Hairfall & Thinning",  icon:"≋", accent:"#F0FDF4", border:"#BBF7D0"},
+  {id:"dandruff",   label:"Dandruff & Scalp",     icon:"⌇", accent:"#FFFBEB", border:"#FDE68A"},
+  {id:"glow",       label:"Glow & Radiance",      icon:"✦", accent:"#FEFCE8", border:"#FEF08A"},
+  {id:"sensitivity",label:"Sensitive Skin",       icon:"◌", accent:"#FFF1F2", border:"#FECDD3"},
+  {id:"pores",      label:"Open Pores",           icon:"○", accent:"#F8FAFC", border:"#CBD5E1"},
+  {id:"energy",     label:"Energy & Immunity",    icon:"◆", accent:"#F0FDF4", border:"#86EFAC"},
 ];
 
 const ROUTINES = [
@@ -255,11 +262,13 @@ function PCard({p,width}) {
         style={{background:p.bg,height:172,position:"relative",overflow:"hidden",flexShrink:0,
           display:"flex",alignItems:"center",justifyContent:"center"}}>
         {/* Product silhouette */}
-        <div style={{textAlign:"center",padding:14}}>
-          <div style={{fontSize:8,fontWeight:700,color:"rgba(0,0,0,.25)",letterSpacing:"0.12em",
-            textTransform:"uppercase",marginBottom:8}}>{p.brand}</div>
-          <div style={{width:52,height:72,background:"rgba(255,255,255,.55)",margin:"0 auto",
-            border:"1px solid rgba(255,255,255,.75)",borderRadius:2}}/>
+        <div style={{textAlign:"center",padding:14,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%"}}>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:52,fontWeight:600,
+            color:"rgba(0,0,0,.1)",lineHeight:1,marginBottom:4,letterSpacing:"-0.02em"}}>
+            {p.brand[0]}
+          </div>
+          <div style={{fontSize:8,fontWeight:700,color:"rgba(0,0,0,.18)",
+            letterSpacing:"0.12em",textTransform:"uppercase"}}>{p.brand.split(" ")[0]}</div>
         </div>
         {p.badge && (
           <div style={{position:"absolute",top:8,left:8}}>
@@ -1010,7 +1019,7 @@ function Home({setPage}) {
   const isMobile = useWindowWidth() < 768;
 
   const ROWS = useMemo(()=>[
-    {id:"trending",  title:"Trending This Week",       sub:"Most loved right now",    prods:ALL.filter(p=>p.badge==="TRENDING"||p.badge==="BESTSELLER")},
+    {id:"trending",  title:"Trending This Week",       sub:"Most Loved",              prods:ALL.filter(p=>p.badge==="TRENDING"||p.badge==="BESTSELLER")},
     {id:"skin",      title:"Skincare Essentials",       sub:"Skin",                    prods:ALL.filter(p=>p.cat==="skin")},
     {id:"derm",      title:"Dermatologist Recommended", sub:"Expert picks",            prods:ALL.filter(p=>p.badge==="DERM PICK"||p.rating>=4.7)},
     {id:"under999",  title:"Under ₹999",                sub:"Budget-friendly",         prods:ALL.filter(p=>p.price<999)},
@@ -1029,28 +1038,26 @@ function Home({setPage}) {
         padding:"32px 32px 0",overflow:"hidden"}}>
         <div style={{maxWidth:1140,margin:"0 auto"}}>
 
-          {/* Top strip: headline left + trust signals right */}
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
-            marginBottom:24,flexWrap:"wrap",gap:16}}>
-            <div>
-              <div style={{display:"inline-flex",alignItems:"center",gap:8,
-                background:T.emeraldBg,border:`1px solid ${T.emeraldLight}44`,
-                padding:"5px 12px",marginBottom:12}}>
-                <span style={{width:4,height:4,borderRadius:"50%",background:T.emeraldLight}}/>
-                <span style={{fontSize:9,fontWeight:700,color:T.emerald,
-                  letterSpacing:"0.16em",textTransform:"uppercase"}}>
-                  India's Premium Wellness Platform
-                </span>
-              </div>
-              <h1 style={{fontFamily:"'Cormorant Garamond',Georgia,serif",
-                fontSize:"clamp(30px,4vw,52px)",fontWeight:400,color:T.text,
-                lineHeight:1.05,letterSpacing:"-0.01em"}}>
-                Your skin. Your ritual.<br/>
-                <span style={{fontStyle:"italic",color:T.emerald}}>Your daily dose.</span>
-              </h1>
+          {/* Hero: single left-aligned editorial block */}
+          <div style={{marginBottom:28}}>
+            <div style={{display:"inline-flex",alignItems:"center",gap:8,
+              background:T.emeraldBg,border:`1px solid ${T.emeraldLight}44`,
+              padding:"5px 12px",marginBottom:14}}>
+              <span style={{width:4,height:4,borderRadius:"50%",background:T.emeraldLight}}/>
+              <span style={{fontSize:9,fontWeight:700,color:T.emerald,
+                letterSpacing:"0.16em",textTransform:"uppercase"}}>
+                India's Premium Wellness Platform
+              </span>
             </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignSelf:"flex-start",paddingTop:4}}>
-              <Btn sz="lg" onClick={()=>setPage("skin")}>Shop Now -&gt;</Btn>
+            <h1 style={{fontFamily:"'Cormorant Garamond',Georgia,serif",
+              fontSize:"clamp(32px,4.5vw,62px)",fontWeight:400,color:T.text,
+              lineHeight:1.02,letterSpacing:"-0.01em",marginBottom:20,
+              maxWidth:isMobile?"100%":580}}>
+              Your skin.<br/>Your ritual.<br/>
+              <span style={{fontStyle:"italic",color:T.emerald}}>Your daily dose.</span>
+            </h1>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+              <Btn sz="lg" onClick={()=>setPage("skin")}>Shop Now →</Btn>
               <Btn sz="lg" v="outline" onClick={()=>setPage("quiz")}>Find My Dose</Btn>
             </div>
           </div>
@@ -1065,11 +1072,13 @@ function Home({setPage}) {
                 onClick={()=>setPage("product/"+p.id)}>
                 <div style={{background:p.bg,height:130,flexShrink:0,display:"flex",alignItems:"center",
                   justifyContent:"center",position:"relative"}}>
-                  <div style={{textAlign:"center",padding:10}}>
-                    <div style={{fontSize:7,fontWeight:700,color:"rgba(0,0,0,.25)",
-                      letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:6}}>{p.brand}</div>
-                    <div style={{width:42,height:58,background:"rgba(255,255,255,.55)",
-                      margin:"0 auto",border:"1px solid rgba(255,255,255,.75)",borderRadius:2}}/>
+                  <div style={{textAlign:"center",padding:10,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%"}}>
+                    <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:44,fontWeight:600,
+                      color:"rgba(0,0,0,.12)",lineHeight:1,marginBottom:4,letterSpacing:"-0.02em"}}>
+                      {p.brand[0]}
+                    </div>
+                    <div style={{fontSize:7,fontWeight:700,color:"rgba(0,0,0,.2)",
+                      letterSpacing:"0.12em",textTransform:"uppercase"}}>{p.brand.split(" ")[0]}</div>
                   </div>
                   {p.badge && (
                     <div style={{position:"absolute",top:6,left:6}}>
@@ -1174,11 +1183,12 @@ function Home({setPage}) {
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:7}}>
             {CONCERNS.map(c=>(
               <div key={c.id} onClick={()=>setPage("concern/"+c.id)}
-                style={{background:T.white,border:`1px solid ${T.border}`,
-                  padding:"13px 15px",cursor:"pointer",transition:"all .16s"}}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor=T.emerald;e.currentTarget.style.background=T.emeraldBg;e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 4px 12px ${T.shadow}`;}}
-                onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.white;e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
-                <div style={{fontSize:12,fontWeight:600,color:T.text,marginBottom:2}}>{c.label}</div>
+                style={{background:c.accent,border:`1.5px solid ${c.border}`,
+                  padding:"12px 14px",cursor:"pointer",transition:"all .16s",display:"flex",alignItems:"center",gap:10}}
+                onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=`0 6px 16px rgba(0,0,0,.08)`;}}
+                onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
+                <span style={{fontSize:16,flexShrink:0,opacity:0.7}}>{c.icon}</span>
+                <div style={{fontSize:12,fontWeight:600,color:T.text,lineHeight:1.3}}>{c.label}</div>
               </div>
             ))}
           </div>
@@ -3002,9 +3012,62 @@ const useCtx = () => useContext(Ctx);
 // When VITE_USE_SHOPIFY=true this gets replaced by the Storefront API response.
 let PRODUCTS = ALL;
 
+// ─── MOBILE BOTTOM NAV ───────────────────────────────────────────────────────
+function MobileBottomNav({page,setPage}) {
+  const {cartCount,wishlist,setAuthOpen,user,setCartOpen} = useCtx();
+  const cur = p => {
+    if(p==="home"&&(page==="home"||page===""))return true;
+    if(p==="cats"&&(page==="skin"||page==="hair"||page==="wellness"||page==="makeup"))return true;
+    if(p==="search"&&(page==="search"||page.startsWith("search/")))return true;
+    if(p==="wishlist"&&page==="wishlist")return true;
+    if(p==="account"&&(page==="account"||page==="myskin"))return true;
+    return false;
+  };
+  const tabs = [
+    {id:"home",   label:"Home",       page:"home",
+      icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>},
+    {id:"cats",   label:"Categories", page:"skin",
+      icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>},
+    {id:"search", label:"Search",     page:"search",
+      icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>},
+    {id:"wishlist",label:"Wishlist",  page:"wishlist",
+      icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>},
+    {id:"account",label:"Account",   page:"account",
+      icon:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" stroke="currentColor"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
+  ];
+  return (
+    <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:1400,
+      background:"#fff",borderTop:"1px solid #E8E4DE",
+      display:"flex",height:56,paddingBottom:"env(safe-area-inset-bottom)"}}>
+      {tabs.map(t=>{
+        const active = cur(t.id);
+        return (
+          <button key={t.id}
+            onClick={()=>t.id==="account"&&!user ? setAuthOpen(true) : setPage(t.page)}
+            style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",
+              justifyContent:"center",gap:2,border:"none",background:"none",cursor:"pointer",
+              color:active?T.emerald:T.textMuted,fontFamily:"inherit",
+              transition:"color .15s",padding:"4px 0",position:"relative"}}>
+            {t.id==="wishlist"&&wishlist.length>0&&(
+              <span style={{position:"absolute",top:4,right:"calc(50% - 18px)",
+                background:T.red,color:"#fff",fontSize:7,fontWeight:800,
+                minWidth:14,height:14,borderRadius:7,display:"flex",alignItems:"center",
+                justifyContent:"center",padding:"0 3px"}}>{wishlist.length}</span>
+            )}
+            <span style={{display:"flex"}}>{t.icon}</span>
+            <span style={{fontSize:9,fontWeight:active?700:500,letterSpacing:"0.04em",
+              textTransform:"uppercase"}}>{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function App() {
   const [page,setPage]               = useState("home");
   const [productsReady,setProductsReady] = useState(!shopifyEnabled);
+  const isMobile = useWindowWidth() < 768;
 
   // Lazy init: read from localStorage on first render — no flash, no race condition
   const [cart,setCart]               = useState(()=>{ try{return JSON.parse(localStorage.getItem("dz_cart")||"{}");}catch{return {};} });
