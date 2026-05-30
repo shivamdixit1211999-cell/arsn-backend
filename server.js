@@ -405,6 +405,66 @@ app.patch("/api/settings", async (req, res) => {
   res.json(data);
 });
 
+// Broadcast — send a WhatsApp message to a filtered set of leads
+const broadcastLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false });
+
+app.post("/api/broadcast", broadcastLimiter, async (req, res) => {
+  const tid = await getTenant(req, res);
+  if (!tid) return;
+
+  const { message, filter = {}, lead_ids } = req.body;
+  if (!message?.trim()) return res.status(400).json({ error: "message is required" });
+
+  const { data: tenant } = await supabase
+    .from("tenants")
+    .select("whatsapp_phone_id, whatsapp_token")
+    .eq("id", tid).single();
+
+  if (!tenant?.whatsapp_phone_id || !tenant?.whatsapp_token) {
+    return res.status(400).json({ error: "WhatsApp not configured — add credentials in Settings" });
+  }
+
+  // Resolve target leads
+  let leads;
+  if (Array.isArray(lead_ids) && lead_ids.length) {
+    const { data } = await supabase
+      .from("leads").select("id, phone")
+      .eq("tenant_id", tid).in("id", lead_ids);
+    leads = data;
+  } else {
+    let query = supabase.from("leads").select("id, phone").eq("tenant_id", tid);
+    if (filter.state) query = query.eq("state", filter.state);
+    if (filter.source) query = query.eq("source", filter.source);
+    const { data } = await query;
+    leads = data;
+  }
+
+  if (!leads?.length) return res.status(400).json({ error: "No leads matched" });
+  if (leads.length > 500) return res.status(400).json({ error: "Broadcast capped at 500 leads per call" });
+
+  // Send in batches of 10 with a small pause to respect WA rate limits
+  const results = { sent: 0, failed: 0, total: leads.length };
+  const BATCH = 10;
+
+  for (let i = 0; i < leads.length; i += BATCH) {
+    const batch = leads.slice(i, i + BATCH);
+    await Promise.allSettled(batch.map(async (lead) => {
+      try {
+        const r = await fetch(`https://graph.facebook.com/v18.0/${tenant.whatsapp_phone_id}/messages`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${tenant.whatsapp_token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ messaging_product: "whatsapp", to: lead.phone, type: "text", text: { body: message } }),
+        });
+        r.ok ? results.sent++ : results.failed++;
+      } catch { results.failed++; }
+    }));
+    // Brief pause between batches
+    if (i + BATCH < leads.length) await new Promise(r => setTimeout(r, 500));
+  }
+
+  res.json({ ok: true, ...results });
+});
+
 // Products
 app.get("/api/products", async (req, res) => {
   const token = req.headers.authorization?.replace("Bearer ", "");
