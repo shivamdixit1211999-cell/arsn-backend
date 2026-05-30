@@ -45,6 +45,7 @@ button,input,select,textarea{font-family:inherit;}
 @keyframes slideDown{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
 @keyframes pulse{0%,100%{opacity:.6;}50%{opacity:1;}}
 @keyframes spin{to{transform:rotate(360deg);}}
+@keyframes marquee{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
 `;
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
@@ -1006,6 +1007,7 @@ function AIBar() {
 // CRO fix: products-FIRST hero — 4 product cards visible above fold before any copy
 function Home({setPage}) {
   const {addCart,cart,showNotif,profile} = useCtx();
+  const isMobile = useWindowWidth() < 768;
 
   const ROWS = useMemo(()=>[
     {id:"trending",  title:"Trending This Week",       sub:"Most loved right now",    prods:ALL.filter(p=>p.badge==="TRENDING"||p.badge==="BESTSELLER")},
@@ -1102,29 +1104,53 @@ function Home({setPage}) {
         </div>
       </section>
 
-      {/* ── TRUST BAR — ivory bg, not separate dark section ─────────────── */}
-      <div style={{background:T.white,borderBottom:`1px solid ${T.borderLight}`}}>
-        <div style={{maxWidth:1140,margin:"0 auto",display:"flex",overflow:"hidden"}}>
-          {[
-            ["100% Authentic","Direct from brands"],
-            ["Dermatologist Curated","Expert-vetted SKUs"],
-            ["10L+ Customers","Trusted & loved"],
-            ["Free Delivery","Orders above ₹499"],
-            ["Easy Returns","7-day hassle-free"],
-          ].map(([h,s],i)=>(
-            <div key={h} style={{flex:1,padding:"13px 0",textAlign:"center",
-              borderRight:i<4?`1px solid ${T.borderLight}`:"none",minWidth:0}}>
-              <div style={{fontSize:11,fontWeight:700,color:T.text,marginBottom:1,
-                whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",padding:"0 6px"}}>
-                {h}
-              </div>
-              <div style={{fontSize:10,color:T.textMuted,whiteSpace:"nowrap",
-                overflow:"hidden",textOverflow:"ellipsis",padding:"0 6px"}}>
-                {s}
-              </div>
+      {/* ── TRUST BAR ─────────────────────────────────────────────────────── */}
+      <div style={{background:T.white,borderBottom:`1px solid ${T.borderLight}`,overflow:"hidden"}}>
+        {isMobile ? (
+          /* Mobile: auto-scrolling marquee ticker */
+          <div style={{position:"relative",overflow:"hidden",height:44}}>
+            <div style={{display:"flex",animation:"marquee 18s linear infinite",width:"max-content",alignItems:"center",height:"100%"}}>
+              {[...Array(2)].flatMap((_,ri)=>
+                [
+                  ["✦","100% Authentic","Direct from brands"],
+                  ["✦","Dermatologist Curated","Expert-vetted"],
+                  ["✦","10L+ Customers","Trusted & loved"],
+                  ["✦","Free Delivery","Above ₹499"],
+                  ["✦","Easy Returns","7-day hassle-free"],
+                ].map(([dot,h,s],i)=>(
+                  <div key={`${ri}-${i}`} style={{display:"flex",alignItems:"center",gap:6,padding:"0 22px",whiteSpace:"nowrap",borderRight:`1px solid ${T.borderLight}`}}>
+                    <span style={{color:T.emerald,fontSize:8}}>✦</span>
+                    <span style={{fontSize:11,fontWeight:700,color:T.text}}>{h}</span>
+                    <span style={{fontSize:10,color:T.textMuted}}>— {s}</span>
+                  </div>
+                ))
+              )}
             </div>
-          ))}
-        </div>
+          </div>
+        ) : (
+          /* Desktop: 5-column grid */
+          <div style={{maxWidth:1140,margin:"0 auto",display:"flex"}}>
+            {[
+              ["100% Authentic","Direct from brands"],
+              ["Dermatologist Curated","Expert-vetted SKUs"],
+              ["10L+ Customers","Trusted & loved"],
+              ["Free Delivery","Orders above ₹499"],
+              ["Easy Returns","7-day hassle-free"],
+            ].map(([h,s],i)=>(
+              <div key={h} style={{flex:1,padding:"13px 0",textAlign:"center",
+                borderRight:i<4?`1px solid ${T.borderLight}`:"none",minWidth:0}}>
+                <div style={{fontSize:11,fontWeight:700,color:T.text,marginBottom:1,
+                  whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",padding:"0 6px"}}>
+                  {h}
+                </div>
+                <div style={{fontSize:10,color:T.textMuted,whiteSpace:"nowrap",
+                  overflow:"hidden",textOverflow:"ellipsis",padding:"0 6px"}}>
+                  {s}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── MAIN CONTENT ─────────────────────────────────────────────────── */}
