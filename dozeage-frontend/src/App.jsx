@@ -500,6 +500,17 @@ function Nav({page,setPage}) {
 
         <div style={{display:"flex",gap:8,alignItems:"center",marginLeft:"auto",flexShrink:0}}>
           {!isMobile && <Btn v="outline" sz="sm" onClick={()=>setPage("quiz")}>Find My Dose</Btn>}
+          {isMobile && (
+            <button onClick={()=>navSetPage("search")}
+              style={{display:"flex",alignItems:"center",padding:"8px 10px",
+                background:T.ivoryAlt,border:`1px solid ${T.border}`,cursor:"pointer",fontFamily:"inherit"}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor=T.emerald}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="1.8">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </button>
+          )}
           {/* Wishlist icon */}
           <button onClick={()=>navSetPage("wishlist")}
             style={{display:"flex",alignItems:"center",gap:5,padding:"8px 12px",
@@ -1401,7 +1412,7 @@ const QUIZ_BUDGET_MAP = {
 };
 
 function Quiz({setPage}) {
-  const {addCart,cart} = useCtx();
+  const {addCart,cart,unlockMilestone} = useCtx();
   const [step,setStep]       = useState(0);
   const [done,setDone]       = useState(false);
   const [answers,setAnswers] = useState([]);
@@ -1414,7 +1425,7 @@ function Quiz({setPage}) {
   const answer = opt => {
     const next = [...answers, opt];
     setAnswers(next);
-    if(step<STEPS.length-1) setStep(step+1); else setDone(true);
+    if(step<STEPS.length-1) setStep(step+1); else { setDone(true); unlockMilestone("quiz"); }
   };
   const concern   = QUIZ_CONCERN_MAP[answers[0]];
   const maxBudget = QUIZ_BUDGET_MAP[answers[3]];
@@ -2438,21 +2449,19 @@ const useCtx = () => useContext(Ctx);
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function App() {
   const [page,setPage]               = useState("home");
-  const [cart,setCart]               = useState({});
+  // Lazy init: read from localStorage on first render — no flash, no race condition
+  const [cart,setCart]               = useState(()=>{ try{return JSON.parse(localStorage.getItem("dz_cart")||"{}");}catch{return {};} });
   const [cartOpen,setCartOpen]       = useState(false);
   const [aiOpen,setAiOpen]           = useState(false);
-  const [wishlist,setWishlist]       = useState([]);
-  const [profile,setProfile]         = useState(defaultProfile);
+  const [wishlist,setWishlist]       = useState(()=>{ try{return JSON.parse(localStorage.getItem("dz_wish")||"[]");}catch{return [];} });
+  const [profile,setProfile]         = useState(()=>{ try{const v=localStorage.getItem("dz_profile");return v?JSON.parse(v):defaultProfile();}catch{return defaultProfile();} });
   const [profileOpen,setProfileOpen] = useState(false);
   const [notifBanner,setNotifBanner] = useState(null);
 
-  // localStorage persistence
-  useEffect(()=>{ try{const v=localStorage.getItem("dz_cart"); if(v) setCart(JSON.parse(v));} catch(_){} },[]);
-  useEffect(()=>{ try{localStorage.setItem("dz_cart",JSON.stringify(cart));} catch(_){} },[cart]);
-  useEffect(()=>{ try{const v=localStorage.getItem("dz_wish"); if(v) setWishlist(JSON.parse(v));} catch(_){} },[]);
-  useEffect(()=>{ try{localStorage.setItem("dz_wish",JSON.stringify(wishlist));} catch(_){} },[wishlist]);
-  useEffect(()=>{ try{const v=localStorage.getItem("dz_profile"); if(v) setProfile(JSON.parse(v));} catch(_){} },[]);
-  useEffect(()=>{ try{localStorage.setItem("dz_profile",JSON.stringify(profile));} catch(_){} },[profile]);
+  // Persist on change
+  useEffect(()=>{ try{localStorage.setItem("dz_cart",JSON.stringify(cart));}catch(_){} },[cart]);
+  useEffect(()=>{ try{localStorage.setItem("dz_wish",JSON.stringify(wishlist));}catch(_){} },[wishlist]);
+  useEffect(()=>{ try{localStorage.setItem("dz_profile",JSON.stringify(profile));}catch(_){} },[profile]);
 
   const cartCount = Object.values(cart).reduce((s,v)=>s+(v||0),0);
 
