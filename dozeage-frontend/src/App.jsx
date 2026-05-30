@@ -296,35 +296,30 @@ function PCard({p,width}) {
       </div>
 
       {/* Info */}
-      <div style={{padding:"10px 11px 13px",flex:1,display:"flex",flexDirection:"column",gap:4}}>
+      <div onClick={()=>setPage("product/"+p.id)} style={{padding:"10px 11px 0",flex:1,display:"flex",flexDirection:"column",gap:3}}>
         <div style={{fontSize:9,color:T.gold,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase"}}>{p.brand}</div>
         <div style={{fontSize:12,fontWeight:500,color:T.text,lineHeight:1.3,flex:1,
-          display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>
+          display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",marginBottom:2}}>
           {p.name}
         </div>
         <Stars r={p.rating} n={p.reviews}/>
-        <div style={{fontSize:10,color:T.emeraldMid,fontWeight:600}}>
-          {p.sold>=1000?`${(p.sold/1000).toFixed(1)}k`:`${p.sold}`} sold this week
-        </div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:3,gap:4}}>
-          <div>
-            <span style={{fontSize:14,fontWeight:700,letterSpacing:"-0.01em"}}>₹{p.price.toLocaleString()}</span>
-            {p.mrp>p.price && (
-              <span style={{fontSize:10,color:T.textMuted,textDecoration:"line-through",marginLeft:4}}>
-                ₹{p.mrp}
-              </span>
-            )}
-          </div>
-          {/* CRO FIX: emerald Add button — action signal, not decoration */}
-          <button onClick={e=>{e.stopPropagation();addCart(p.id);}}
-            style={{background:inCart?T.emerald:T.emeraldBg,color:inCart?"#fff":T.emerald,
-              border:"none",padding:"7px 12px",fontSize:10,fontWeight:700,
-              letterSpacing:"0.04em",cursor:"pointer",transition:"all .15s",
-              textTransform:"uppercase",fontFamily:"inherit",flexShrink:0}}>
-            {inCart?"✓ Added":"Add"}
-          </button>
+        <div style={{display:"flex",alignItems:"baseline",gap:5,marginTop:3}}>
+          <span style={{fontSize:14,fontWeight:700,letterSpacing:"-0.01em",
+            color:disc>=5?"#DC2626":T.text}}>₹{p.price.toLocaleString()}</span>
+          {p.mrp>p.price && <>
+            <span style={{fontSize:10,color:T.textMuted,textDecoration:"line-through"}}>₹{p.mrp}</span>
+            <span style={{fontSize:9,color:"#DC2626",fontWeight:700}}>-{disc}%</span>
+          </>}
         </div>
       </div>
+      {/* Full-width Add to Bag — Tira pattern */}
+      <button onClick={e=>{e.stopPropagation();addCart(p.id);}}
+        style={{margin:"8px 11px 11px",background:inCart?"#1B4332":"#111",color:"#fff",
+          border:"none",padding:"9px 0",fontSize:10,fontWeight:700,
+          letterSpacing:"0.08em",cursor:"pointer",transition:"background .15s",
+          textTransform:"uppercase",fontFamily:"inherit",width:"calc(100% - 22px)"}}>
+        {inCart?"✓ Added to Bag":"Add to Bag"}
+      </button>
     </div>
   );
 }
@@ -437,7 +432,7 @@ function Nav({page,setPage}) {
       }}>
         <div style={{padding:`6px ${isMobile?"14px":"32px"}`,display:"flex",justifyContent:"space-between",
           alignItems:"center",fontSize:11,color:"rgba(255,255,255,.65)",letterSpacing:"0.05em"}}>
-          <span style={{fontWeight:400,whiteSpace:"nowrap"}}>Free delivery above ₹499 &middot; Pan India</span>
+          <span style={{fontWeight:600,whiteSpace:"nowrap",color:"#fff"}}>✦ Use <strong>WELCOME10</strong> — ₹100 off your first order</span>
           <div style={{display:"flex",gap:16,alignItems:"center"}}>
             {!isMobile && (
               <span onClick={()=>setPage("b2b")}
@@ -800,7 +795,7 @@ function CartDrawer() {
           </button>
         </div>
         <AOVBar subtotal={subtotal}/>
-        <div style={{flex:1,overflowY:"auto",padding:"0 22px"}}>
+        <div style={{flex:1,overflowY:"auto",padding:"0 22px",display:"flex",flexDirection:"column"}}>
           {items.length===0 ? (
             <div style={{padding:"60px 0",textAlign:"center"}}>
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,
@@ -835,12 +830,43 @@ function CartDrawer() {
               </div>
             </div>
           ))}
+          {/* You May Also Like — cross-sell inside cart (Tira pattern) */}
+          {items.length>0 && (()=>{
+            const cats = [...new Set(items.map(p=>p.cat))];
+            const cross = ALL.filter(p=>!cart[p.id]&&cats.includes(p.cat)).slice(0,6);
+            if(!cross.length) return null;
+            return (
+              <div style={{paddingTop:16,paddingBottom:8}}>
+                <div style={{fontSize:10,fontWeight:700,color:T.textMuted,letterSpacing:"0.1em",
+                  textTransform:"uppercase",marginBottom:10}}>You May Also Like</div>
+                <div style={{display:"flex",gap:10,overflowX:"auto",scrollbarWidth:"none",paddingBottom:4}}>
+                  {cross.map(p=>(
+                    <div key={p.id} style={{flexShrink:0,width:110,cursor:"pointer"}}
+                      onClick={()=>{setCartOpen(false);drawerSetPage("product/"+p.id);}}>
+                      <div style={{width:110,height:90,background:p.bg,border:`1px solid ${T.borderLight}`,
+                        display:"flex",alignItems:"center",justifyContent:"center",marginBottom:5}}>
+                        <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:30,
+                          color:"rgba(0,0,0,.1)",fontWeight:600}}>{p.brand[0]}</span>
+                      </div>
+                      <div style={{fontSize:9,color:T.textMuted,marginBottom:1,overflow:"hidden",
+                        whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{p.name}</div>
+                      <div style={{fontSize:11,fontWeight:700,color:(p.mrp>p.price?Math.round((1-p.price/p.mrp)*100):0)>=5?"#DC2626":T.text}}>₹{p.price}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
         {items.length>0 && (
           <div style={{padding:"16px 22px",borderTop:`1px solid ${T.border}`}}>
             {savings>0 && (
-              <div style={{fontSize:11,color:T.emeraldMid,fontWeight:600,marginBottom:8}}>
-                You save ₹{savings.toLocaleString()} on this order
+              <div style={{background:T.emeraldBg,border:`1px solid ${T.emeraldLight}55`,
+                padding:"8px 12px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:14}}>🎉</span>
+                <span style={{fontSize:12,color:T.emerald,fontWeight:700}}>
+                  You save ₹{savings.toLocaleString()} with this order!
+                </span>
               </div>
             )}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:14}}>
@@ -1032,10 +1058,32 @@ function Home({setPage}) {
   return (
     <div style={{paddingBottom:80}}>
 
+      {/* ── MOBILE SEARCH BAR — Tira pattern: first thing above fold ─────── */}
+      {isMobile && (
+        <div style={{padding:"8px 14px 10px",background:T.white,
+          borderBottom:`1px solid ${T.borderLight}`}}>
+          <div onClick={()=>setPage("search")}
+            style={{display:"flex",alignItems:"center",gap:10,
+              background:T.ivoryAlt,border:`1px solid ${T.border}`,
+              padding:"10px 14px",cursor:"pointer",transition:"border-color .15s"}}
+            onTouchStart={e=>e.currentTarget.style.borderColor=T.emerald}
+            onTouchEnd={e=>e.currentTarget.style.borderColor=T.border}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+              stroke={T.textMuted} strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <span style={{flex:1,fontSize:13,color:T.textMuted,fontWeight:400}}>
+              Search products, brands, ingredients...
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ── HERO: ivory base, products front-centre ─────────────────────── */}
       {/* CRO: products-first layout. Headline is secondary to product visibility */}
       <section style={{background:T.ivory,borderBottom:`1px solid ${T.border}`,
-        padding:"32px 32px 0",overflow:"hidden"}}>
+        padding:isMobile?"16px 14px 0":"32px 32px 0",overflow:"hidden"}}>
         <div style={{maxWidth:1140,margin:"0 auto"}}>
 
           {/* Hero: single left-aligned editorial block */}
@@ -1163,7 +1211,7 @@ function Home({setPage}) {
       </div>
 
       {/* ── MAIN CONTENT ─────────────────────────────────────────────────── */}
-      <div style={{maxWidth:1140,margin:"0 auto",padding:"0 32px"}}>
+      <div style={{maxWidth:1140,margin:"0 auto",padding:isMobile?"0 14px":"0 32px"}}>
 
         {/* Shop by Concern */}
         <section style={{padding:"40px 0 36px"}}>
@@ -1522,9 +1570,34 @@ function ProductDetail({id,setPage}) {
             <span style={{fontSize:11,color:T.emeraldMid,fontWeight:600}}>{p.sold.toLocaleString()} sold this week</span>
           </div>
           {p.badge && <div style={{marginBottom:16}}><BadgeChip type={p.badge}/></div>}
-          <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:26}}>
-            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:30,fontWeight:600,color:T.text}}>₹{p.price.toLocaleString()}</span>
-            {p.mrp>p.price && <><span style={{fontSize:14,color:T.textMuted,textDecoration:"line-through"}}>₹{p.mrp}</span><span style={{fontSize:12,color:T.red,fontWeight:700}}>{disc}% OFF</span></>}
+          <div style={{marginBottom:6}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:2}}>
+              <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:30,fontWeight:600,
+                color:disc>=5?"#DC2626":T.text}}>₹{p.price.toLocaleString()}</span>
+              {p.mrp>p.price && <>
+                <span style={{fontSize:14,color:T.textMuted,textDecoration:"line-through"}}>₹{p.mrp}</span>
+                <span style={{fontSize:12,color:"#DC2626",fontWeight:700}}>{disc}% OFF</span>
+              </>}
+            </div>
+            <div style={{fontSize:10,color:T.textMuted}}>Inclusive of all taxes</div>
+          </div>
+          {/* Scarcity + social proof */}
+          {p.sold>1000 && (
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14,
+              background:"#FEF2F2",border:"1px solid #FECACA",padding:"6px 10px"}}>
+              <span style={{fontSize:12}}>🔥</span>
+              <span style={{fontSize:11,color:"#DC2626",fontWeight:700}}>
+                {p.sold>=1000?`${(p.sold/1000).toFixed(1)}k`:p.sold} sold this week — selling fast
+              </span>
+            </div>
+          )}
+          {/* Dozeage points teaser */}
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:16,
+            background:T.emeraldBg,border:`1px solid ${T.emeraldLight}44`,padding:"6px 10px"}}>
+            <span style={{fontSize:12}}>✦</span>
+            <span style={{fontSize:11,color:T.emeraldMid,fontWeight:600}}>
+              Earn {Math.round(p.price/10)} Dozeage points with this order
+            </span>
           </div>
           {!isMobile && (
             <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
@@ -1545,16 +1618,24 @@ function ProductDetail({id,setPage}) {
               </button>
             </div>
           )}
-          {!isMobile && (
-            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:24,fontSize:12,color:T.emeraldMid,fontWeight:600}}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.emeraldMid} strokeWidth="2">
-                <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
-                <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
-              </svg>
-              Get it by <strong style={{color:T.emerald,marginLeft:3}}>{DELIVERY_DATE}</strong>
-              <span style={{color:T.textMuted,fontWeight:400,marginLeft:4}}>· Order before 5PM</span>
-            </div>
-          )}
+          {/* Delivery info rows — Adidas pattern */}
+          <div style={{border:`1px solid ${T.borderLight}`,marginBottom:20}}>
+            {[
+              {icon:"🚚", text:`Free delivery on orders above ₹499`,sub:""},
+              {icon:"📦", text:`Get it by ${DELIVERY_DATE}`,sub:"Metro: 1-3 days · Others: 3-5 days"},
+              {icon:"💵", text:"COD available",sub:"Pay when delivered · No extra charge"},
+              {icon:"↩️", text:"7-day easy returns",sub:"Hassle-free return & exchange"},
+            ].map(({icon,text,sub},i)=>(
+              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 12px",
+                borderBottom:i<3?`1px solid ${T.borderLight}`:"none"}}>
+                <span style={{fontSize:14,marginTop:1}}>{icon}</span>
+                <div>
+                  <div style={{fontSize:11,fontWeight:600,color:T.text}}>{text}</div>
+                  {sub&&<div style={{fontSize:10,color:T.textMuted,marginTop:1}}>{sub}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
           <div style={{borderTop:`1px solid ${T.borderLight}`,paddingTop:18,display:"flex",flexDirection:"column",gap:11}}>
             {[["Brand",p.brand],["Category",p.sub],["Concern",p.concern||"General"],["Rating",`${p.rating} (${p.reviews.toLocaleString()} reviews)`]].map(([k,v])=>(
               <div key={k} style={{display:"flex",gap:14,alignItems:"baseline"}}>
@@ -3064,6 +3145,115 @@ function MobileBottomNav({page,setPage}) {
   );
 }
 
+// ─── ADD TO BAG SHEET — Adidas-style bottom sheet ─────────────────────────────
+function AddToBagSheet() {
+  const {lastAdded,addSheetOpen,setAddSheetOpen,setCartOpen,addCart,cart,user,setAuthOpen,setPage,cartCount} = useCtx();
+  const p = lastAdded ? ALL.find(x=>x.id===lastAdded) : null;
+  const related = p ? ALL.filter(x=>x.cat===p.cat&&x.id!==p.id&&!cart[x.id]).slice(0,4) : [];
+
+  useEffect(()=>{
+    if(!addSheetOpen) return;
+    const t = setTimeout(()=>setAddSheetOpen(false), 5000);
+    return ()=>clearTimeout(t);
+  },[addSheetOpen]);
+
+  if(!p) return null;
+  return (
+    <>
+      {addSheetOpen && (
+        <div onClick={()=>setAddSheetOpen(false)}
+          style={{position:"fixed",inset:0,background:"rgba(0,0,0,.3)",
+            zIndex:1500,backdropFilter:"blur(2px)"}}/>
+      )}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:1600,
+        background:T.white,borderRadius:"16px 16px 0 0",
+        transform:addSheetOpen?"translateY(0)":"translateY(100%)",
+        transition:"transform .35s cubic-bezier(.16,1,.3,1)",
+        paddingBottom:"env(safe-area-inset-bottom)",
+        boxShadow:"0 -8px 40px rgba(0,0,0,.2)"}}>
+        <div style={{width:36,height:4,background:T.sand,borderRadius:2,margin:"10px auto 0"}}/>
+        {/* Added confirmation row */}
+        <div style={{display:"flex",alignItems:"center",gap:12,
+          padding:"14px 20px 12px",borderBottom:`1px solid ${T.borderLight}`}}>
+          <div style={{width:52,height:52,background:p.bg,flexShrink:0,
+            border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,
+              color:"rgba(0,0,0,.12)",fontWeight:600}}>{p.brand[0]}</span>
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke={T.emerald} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span style={{fontSize:12,fontWeight:700,color:T.emerald}}>Added to Bag!</span>
+            </div>
+            <div style={{fontSize:11,fontWeight:500,color:T.text,overflow:"hidden",
+              textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+            <div style={{fontSize:13,fontWeight:700,color:T.text}}>₹{p.price.toLocaleString()}</div>
+          </div>
+        </div>
+        {/* Sign-in upsell */}
+        {!user && (
+          <div onClick={()=>{setAddSheetOpen(false);setAuthOpen(true);}}
+            style={{display:"flex",alignItems:"center",gap:10,padding:"9px 20px",
+              background:T.emeraldBg,cursor:"pointer",borderBottom:`1px solid ${T.borderLight}`}}>
+            <span style={{fontSize:12,color:T.emerald}}>✦</span>
+            <span style={{fontSize:11,color:T.emeraldMid,fontWeight:600}}>
+              Sign in for free delivery + earn {Math.round(p.price/10)} points →
+            </span>
+          </div>
+        )}
+        {/* Cross-sell */}
+        {related.length>0 && (
+          <div style={{padding:"12px 20px 10px"}}>
+            <div style={{fontSize:9,fontWeight:700,color:T.textMuted,letterSpacing:"0.12em",
+              textTransform:"uppercase",marginBottom:10}}>You May Also Like</div>
+            <div style={{display:"flex",gap:10,overflowX:"auto",scrollbarWidth:"none",paddingBottom:4}}>
+              {related.map(rp=>(
+                <div key={rp.id} style={{flexShrink:0,width:100,cursor:"pointer"}}
+                  onClick={()=>{setAddSheetOpen(false);setPage("product/"+rp.id);}}>
+                  <div style={{width:100,height:78,background:rp.bg,
+                    border:`1px solid ${T.borderLight}`,display:"flex",
+                    alignItems:"center",justifyContent:"center",marginBottom:4}}>
+                    <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:26,
+                      color:"rgba(0,0,0,.12)",fontWeight:600}}>{rp.brand[0]}</span>
+                  </div>
+                  <div style={{fontSize:9,color:T.textMuted,marginBottom:2,overflow:"hidden",
+                    textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{rp.name}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:11,fontWeight:700,color:T.text}}>₹{rp.price}</span>
+                    <button onClick={e=>{e.stopPropagation();addCart(rp.id);}}
+                      style={{fontSize:8,fontWeight:700,background:T.emerald,color:"#fff",
+                        border:"none",padding:"3px 7px",cursor:"pointer",
+                        fontFamily:"inherit",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                      Add
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* CTAs */}
+        <div style={{display:"flex",gap:10,padding:"10px 20px 16px"}}>
+          <button onClick={()=>{setAddSheetOpen(false);setCartOpen(true);}}
+            style={{flex:1,background:T.emerald,color:"#fff",border:"none",
+              padding:"13px 0",fontSize:12,fontWeight:700,cursor:"pointer",
+              fontFamily:"inherit",textTransform:"uppercase",letterSpacing:"0.08em"}}>
+            View Bag ({cartCount})
+          </button>
+          <button onClick={()=>setAddSheetOpen(false)}
+            style={{flex:1,background:T.ivoryAlt,border:`1px solid ${T.border}`,
+              padding:"13px 0",fontSize:12,fontWeight:700,cursor:"pointer",
+              fontFamily:"inherit",textTransform:"uppercase",letterSpacing:"0.06em",
+              color:T.textMid}}>
+            Continue
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function App() {
   const [page,setPage]               = useState("home");
   const [productsReady,setProductsReady] = useState(!shopifyEnabled);
@@ -3079,6 +3269,8 @@ export default function App() {
   const [notifBanner,setNotifBanner] = useState(null);
   const [user,setUser]               = useState(()=>{ try{const v=localStorage.getItem("dz_user");return v?JSON.parse(v):null;}catch{return null;} });
   const [authOpen,setAuthOpen]       = useState(false);
+  const [lastAdded,setLastAdded]     = useState(null);
+  const [addSheetOpen,setAddSheetOpen] = useState(false);
 
   // Bootstrap Shopify products when env flag is on
   useEffect(()=>{
@@ -3095,7 +3287,10 @@ export default function App() {
   const cartCount = Object.values(cart).reduce((s,v)=>s+(v||0),0);
 
   const addCart = useCallback(
-    id => setCart(p=>({...p,[id]:(p[id]||0)+1})),
+    id => {
+      setCart(p=>({...p,[id]:(p[id]||0)+1}));
+      if(window.innerWidth<768){ setLastAdded(id); setAddSheetOpen(true); }
+    },
     []
   );
   const toggleWish = useCallback(
@@ -3149,6 +3344,7 @@ export default function App() {
       wishlist,toggleWish,profile,updateProfile,profileOpen,setProfileOpen,
       unlockMilestone,notifBanner,showNotif,setPage,
       user,setUser,authOpen,setAuthOpen,
+      lastAdded,addSheetOpen,setAddSheetOpen,
     }}>
       <style>{GLOBAL_CSS}</style>
       <Nav page={page} setPage={setPage}/>
@@ -3160,6 +3356,7 @@ export default function App() {
       <ProfileDrawer setPage={setPage}/>
       <AuthModal/>
       {isMobile && <MobileBottomNav page={page} setPage={setPage}/>}
+      {isMobile && <AddToBagSheet/>}
       {!isMobile && <a href="https://wa.me/919876543210" target="_blank" rel="noreferrer"
         style={{position:"fixed",right:20,bottom:72,zIndex:699,background:"#25D366",
           color:"#fff",width:46,height:46,borderRadius:"50%",display:"flex",
