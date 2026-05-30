@@ -358,6 +358,71 @@ app.post("/api/leads/:id/payment-link", async (req, res) => {
   res.json({ ok: true, payment_link: paymentLink.short_url, order });
 });
 
+// Human takes over — disables AI, notifies lead via WhatsApp, bumps lead state
+app.post("/api/conversations/:id/handoff", async (req, res) => {
+  const tid = await getTenant(req, res);
+  if (!tid) return;
+
+  const handoffMessage = req.body?.message ||
+    "You're now connected with our team. They'll be with you shortly! 🙌";
+
+  const { data: conv } = await supabase
+    .from("conversations")
+    .select("id, is_ai_active, lead:leads(id, phone, state)")
+    .eq("id", req.params.id)
+    .eq("tenant_id", tid)
+    .single();
+
+  if (!conv) return res.status(404).json({ error: "Conversation not found" });
+
+  await supabase.from("conversations")
+    .update({ is_ai_active: false })
+    .eq("id", conv.id);
+
+  // Bump lead to qualified if still in early stages
+  const bumpStates = ["new", "engaged"];
+  if (bumpStates.includes(conv.lead?.state)) {
+    await supabase.from("leads")
+      .update({ state: "qualified", last_activity_at: new Date().toISOString() })
+      .eq("id", conv.lead.id);
+  }
+
+  // Notify lead on WhatsApp
+  const { data: tenant } = await supabase
+    .from("tenants").select("whatsapp_phone_id, whatsapp_token").eq("id", tid).single();
+
+  if (tenant?.whatsapp_phone_id && tenant?.whatsapp_token) {
+    await fetch(`https://graph.facebook.com/v18.0/${tenant.whatsapp_phone_id}/messages`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${tenant.whatsapp_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ messaging_product: "whatsapp", to: conv.lead.phone, type: "text", text: { body: handoffMessage } }),
+    }).catch(e => console.error("WhatsApp handoff notify error:", e));
+
+    await supabase.from("messages").insert({
+      tenant_id: tid, conversation_id: conv.id, role: "ai", content: handoffMessage,
+    });
+  }
+
+  res.json({ ok: true, is_ai_active: false, lead_state: "qualified" });
+});
+
+// Hand back to AI — re-enables AI on a conversation
+app.post("/api/conversations/:id/resume-ai", async (req, res) => {
+  const tid = await getTenant(req, res);
+  if (!tid) return;
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .update({ is_ai_active: true })
+    .eq("id", req.params.id)
+    .eq("tenant_id", tid)
+    .select("id, is_ai_active")
+    .single();
+
+  if (error || !data) return res.status(404).json({ error: "Conversation not found" });
+  res.json({ ok: true, ...data });
+});
+
 // Analytics
 app.get("/api/analytics", async (req, res) => {
   const token = req.headers.authorization?.replace("Bearer ", "");
