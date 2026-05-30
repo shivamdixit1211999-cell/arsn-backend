@@ -363,7 +363,7 @@ function ScrollRow({products,cardWidth,title,sub,cta,onCta}) {
 
 // ─── NAV — CRO fix: collapse on scroll, 76px total when scrolled ──────────────
 function Nav({page,setPage}) {
-  const {cartCount,setCartOpen,setAiOpen} = useCtx();
+  const {cartCount,setCartOpen,setAiOpen,setProfileOpen,wishlist,setPage:navSetPage} = useCtx();
   const [scrolled,setScrolled] = useState(false);
   const [mega,setMega]         = useState(null);
   const [searchVal,setSearchVal] = useState("");
@@ -499,6 +499,34 @@ function Nav({page,setPage}) {
 
         <div style={{display:"flex",gap:8,alignItems:"center",marginLeft:"auto",flexShrink:0}}>
           <Btn v="outline" sz="sm" onClick={()=>setPage("quiz")}>Find My Dose</Btn>
+          {/* Wishlist icon */}
+          <button onClick={()=>navSetPage("wishlist")}
+            style={{display:"flex",alignItems:"center",gap:5,padding:"8px 12px",
+              background:T.ivoryAlt,border:`1px solid ${T.border}`,cursor:"pointer",
+              position:"relative",fontFamily:"inherit",transition:"all .15s"}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=T.emerald}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="1.8">
+              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+            </svg>
+            {wishlist&&wishlist.length>0&&(
+              <span style={{background:T.red,color:"#fff",borderRadius:"50%",
+                width:15,height:15,fontSize:8,fontWeight:800,display:"flex",
+                alignItems:"center",justifyContent:"center"}}>{wishlist.length}</span>
+            )}
+          </button>
+          {/* Profile icon */}
+          <button onClick={()=>setProfileOpen(true)}
+            style={{display:"flex",alignItems:"center",gap:5,padding:"8px 12px",
+              background:T.ivoryAlt,border:`1px solid ${T.border}`,cursor:"pointer",
+              fontFamily:"inherit",transition:"all .15s"}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=T.emerald}
+            onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.text} strokeWidth="1.8">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </button>
           <button onClick={()=>setCartOpen(true)}
             style={{display:"flex",alignItems:"center",gap:7,
               padding:"8px 14px",background:T.ivoryAlt,
@@ -612,9 +640,9 @@ function Nav({page,setPage}) {
 function AOVBar({subtotal}) {
   const FREE=499, D1=1500, D2=2500;
   const tiers=[
-    {threshold:FREE, msg:"Add &#8377;"+(FREE-subtotal)+" for free delivery", color:T.emerald},
-    {threshold:D1,   msg:"Add &#8377;"+(D1-subtotal)+" more to save &#8377;150", color:"#7C3AED"},
-    {threshold:D2,   msg:"Add &#8377;"+(D2-subtotal)+" more to save &#8377;300", color:"#B45309"},
+    {threshold:FREE, label:`Add ₹${FREE-subtotal} for free delivery`,      color:T.emerald},
+    {threshold:D1,   label:`Add ₹${D1-subtotal} more to save ₹150`,   color:"#7C3AED"},
+    {threshold:D2,   label:`Add ₹${D2-subtotal} more to save ₹300`,   color:"#B45309"},
   ];
   const next = tiers.find(t=>subtotal<t.threshold);
   if(!next) return (
@@ -627,8 +655,7 @@ function AOVBar({subtotal}) {
   const pct = Math.min(((subtotal-base)/(next.threshold-base))*100,100);
   return (
     <div style={{padding:"10px 22px",background:T.emeraldBg,borderBottom:"1px solid "+T.borderLight}}>
-      <div style={{fontSize:11,color:next.color,fontWeight:600,marginBottom:6}}
-        dangerouslySetInnerHTML={{__html:next.msg}}/>
+      <div style={{fontSize:11,color:next.color,fontWeight:600,marginBottom:6}}>{next.label}</div>
       <div style={{height:4,background:T.ivoryDark,borderRadius:2,overflow:"hidden"}}>
         <div style={{height:"100%",width:pct+"%",background:next.color,transition:"width .5s ease",borderRadius:2}}/>
       </div>
@@ -667,6 +694,7 @@ function CartDrawer() {
             ×
           </button>
         </div>
+        <AOVBar subtotal={subtotal}/>
         <div style={{flex:1,overflowY:"auto",padding:"0 22px"}}>
           {items.length===0 ? (
             <div style={{padding:"60px 0",textAlign:"center"}}>
@@ -868,18 +896,18 @@ function AIBar() {
 // ─── PAGE: HOME ───────────────────────────────────────────────────────────────
 // CRO fix: products-FIRST hero — 4 product cards visible above fold before any copy
 function Home({setPage}) {
-  const {addCart,cart} = useCtx();
+  const {addCart,cart,showNotif,profile} = useCtx();
 
-  const ROWS = [
+  const ROWS = useMemo(()=>[
     {id:"trending",  title:"Trending This Week",       sub:"Most loved right now",    prods:ALL.filter(p=>p.badge==="TRENDING"||p.badge==="BESTSELLER")},
     {id:"skin",      title:"Skincare Essentials",       sub:"Skin",                    prods:ALL.filter(p=>p.cat==="skin")},
     {id:"derm",      title:"Dermatologist Recommended", sub:"Expert picks",            prods:ALL.filter(p=>p.badge==="DERM PICK"||p.rating>=4.7)},
     {id:"under999",  title:"Under ₹999",                sub:"Budget-friendly",         prods:ALL.filter(p=>p.price<999)},
     {id:"hair",      title:"Hair & Scalp",              sub:"Hair",                    prods:ALL.filter(p=>p.cat==="hair")},
     {id:"wellness",  title:"Wellness & Supplements",    sub:"Wellness",                prods:ALL.filter(p=>p.cat==="wellness")},
-    {id:"bundles",title:"Curated Kits",sub:"Save more",prods:ALL.filter(p=>p.badge==="BUNDLE")},
+    {id:"bundles",   title:"Curated Kits",              sub:"Save more",               prods:ALL.filter(p=>p.badge==="BUNDLE")},
     {id:"premium",   title:"Premium & Luxury",          sub:"Luxury",                  prods:ALL.filter(p=>p.badge==="PREMIUM"||p.price>=2000)},
-  ];
+  ],[]);
 
   return (
     <div style={{paddingBottom:80}}>
@@ -1056,6 +1084,7 @@ function Home({setPage}) {
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:12}}>
             {ROUTINES.map(r=>(
               <div key={r.id}
+                onClick={()=>setPage("concern/"+r.id)}
                 style={{background:T.white,border:`1px solid ${T.border}`,
                   padding:"22px 20px",cursor:"pointer",transition:"all .18s"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor=T.emerald;e.currentTarget.style.boxShadow=`0 4px 18px ${T.shadow}`;e.currentTarget.style.transform="translateY(-2px)";}}
@@ -1329,18 +1358,39 @@ function ProductDetail({id,setPage}) {
 }
 
 // ─── PAGE: QUIZ ───────────────────────────────────────────────────────────────
+const QUIZ_CONCERN_MAP = {
+  "Acne and Oiliness":"acne","Dryness and Dehydration":"hydration",
+  "Pigmentation":"pigmentation","Ageing and Fine Lines":"ageing",
+  "Dullness":"glow","Hairfall":"hairfall",
+};
+const QUIZ_BUDGET_MAP = {
+  "Under Rs.500":500,"Rs.500-Rs.1,500":1500,
+  "Rs.1,500-Rs.5,000":5000,"No limit":Infinity,
+};
+
 function Quiz({setPage}) {
   const {addCart,cart} = useCtx();
-  const [step,setStep] = useState(0);
-  const [done,setDone] = useState(false);
+  const [step,setStep]       = useState(0);
+  const [done,setDone]       = useState(false);
+  const [answers,setAnswers] = useState([]);
   const STEPS = [
     {q:"What is your primary concern?",     opts:["Acne and Oiliness","Dryness and Dehydration","Pigmentation","Ageing and Fine Lines","Dullness","Hairfall"]},
     {q:"How would you describe your skin?", opts:["Oily","Dry","Combination","Sensitive","Normal"]},
     {q:"Steps per routine?",                opts:["2-3 (minimal)","4-5 (standard)","6+ (full ritual)"]},
     {q:"Monthly budget for skin?",          opts:["Under Rs.500","Rs.500-Rs.1,500","Rs.1,500-Rs.5,000","No limit"]},
   ];
-  const answer = () => { if(step<STEPS.length-1) setStep(step+1); else setDone(true); };
-  const rProds = ALL.filter((_,i)=>[0,2,5,11].includes(i));
+  const answer = opt => {
+    const next = [...answers, opt];
+    setAnswers(next);
+    if(step<STEPS.length-1) setStep(step+1); else setDone(true);
+  };
+  const concern   = QUIZ_CONCERN_MAP[answers[0]];
+  const maxBudget = QUIZ_BUDGET_MAP[answers[3]];
+  let rProds = ALL
+    .filter(p=>!concern||p.concern===concern)
+    .filter(p=>!maxBudget||p.price<=maxBudget)
+    .slice(0,4);
+  if(rProds.length<2) rProds = ALL.filter((_,i)=>[0,2,5,11].includes(i));
   return (
     <div style={{paddingBottom:100,background:T.ivory,minHeight:"100vh"}}>
       <div style={{background:T.white,borderBottom:`1px solid ${T.border}`,padding:"18px 32px"}}>
@@ -1357,7 +1407,7 @@ function Quiz({setPage}) {
             <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(18px,2.5vw,26px)",fontWeight:400,marginBottom:28,color:T.text,lineHeight:1.2,fontStyle:"italic"}}>{STEPS[step].q}</h2>
             <div style={{display:"flex",flexDirection:"column",gap:7}}>
               {STEPS[step].opts.map(opt=>(
-                <button key={opt} onClick={answer}
+                <button key={opt} onClick={()=>answer(opt)}
                   style={{background:T.white,border:`1.5px solid ${T.border}`,padding:"14px 18px",fontSize:13,fontWeight:400,color:T.textMid,cursor:"pointer",textAlign:"left",transition:"all .15s",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:"inherit"}}
                   onMouseEnter={e=>{e.currentTarget.style.borderColor=T.emerald;e.currentTarget.style.background=T.emeraldBg;e.currentTarget.style.color=T.emerald;}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.white;e.currentTarget.style.color=T.textMid;}}>
@@ -1375,7 +1425,7 @@ function Quiz({setPage}) {
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:24}}>
               {rProds.map(p=><PCard key={p.id} p={p}/>)}
             </div>
-            <button onClick={()=>{setStep(0);setDone(false);}} style={{background:"none",border:"none",color:T.textMuted,fontSize:11,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"}}>Retake quiz</button>
+            <button onClick={()=>{setStep(0);setDone(false);setAnswers([]);}} style={{background:"none",border:"none",color:T.textMuted,fontSize:11,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"}}>Retake quiz</button>
           </div>
         )}
       </div>
@@ -1728,7 +1778,7 @@ function ProfileDrawer({setPage}) {
 
 // ─── PAGE: MY SKIN (full dashboard) ──────────────────────────────────────────
 function MySkinPage({setPage}) {
-  const {profile:rawP,updateProfile,unlockMilestone,addCart,cart} = useCtx();
+  const {profile:rawP,updateProfile,unlockMilestone,addCart,cart,showNotif} = useCtx();
   const profile = rawP || defaultProfile();
   const daysActive = profile.createdAt
     ? Math.floor((Date.now()-new Date(profile.createdAt).getTime())/86400000)
@@ -1962,7 +2012,8 @@ function MySkinPage({setPage}) {
           <div style={{flexShrink:0}}>
             <div style={{fontSize:11,color:"rgba(255,255,255,.5)",marginBottom:4,textAlign:"center"}}>Subscribe from</div>
             <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:28,fontWeight:600,color:T.goldLight,textAlign:"center"}}>&#8377;{[0,799,1299,2299][stage]}/mo</div>
-            <button style={{background:"#fff",color:T.emerald,border:"none",padding:"10px 24px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"inherit",marginTop:10,width:"100%"}}>
+            <button onClick={()=>showNotif({title:"Ritual Added",msg:`Your Stage ${stage} ritual box has been queued.`})}
+              style={{background:"#fff",color:T.emerald,border:"none",padding:"10px 24px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"inherit",marginTop:10,width:"100%"}}>
               Start My Ritual
             </button>
           </div>
@@ -2261,12 +2312,20 @@ function ConsultPage({setPage}) {
 }
 
 // ─── FOOTER ───────────────────────────────────────────────────────────────────
+const FOOTER_NAV = {
+  "Skincare":"skin","Hair":"hair","Wellness":"wellness","Vitamins":"wellness",
+  "Makeup":"makeup","Men":"mens","Brands":"brands","Skin Quiz":"quiz",
+  "Shop by Concern":"concern/acne","Bestsellers":"all","Under Rs.500":"all",
+  "New Arrivals":"all","About":"home","B2B / Wholesale":"b2b",
+  "Track Order":"home","Returns":"home","Contact":"home",
+};
+
 function Footer({setPage}) {
   return (
     <footer style={{background:T.ivoryDark,borderTop:`1px solid ${T.border}`,marginBottom:50}}>
       <div style={{maxWidth:1140,margin:"0 auto",padding:"48px 32px 0",display:"grid",gridTemplateColumns:"1.5fr 1fr 1fr 1fr",gap:40}}>
         <div>
-          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:400,color:T.emerald,marginBottom:10,fontStyle:"italic",letterSpacing:"0.04em"}}>Dozeage</div>
+          <div onClick={()=>setPage("home")} style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:400,color:T.emerald,marginBottom:10,fontStyle:"italic",letterSpacing:"0.04em",cursor:"pointer"}}>Dozeage</div>
           <div style={{fontSize:12,color:T.textMuted,lineHeight:1.8,marginBottom:16}}>India's premium marketplace for skin, hair, wellness and vitamins.</div>
           <div style={{fontSize:11,color:T.textMuted}}>support@dozeage.in</div>
         </div>
@@ -2279,7 +2338,8 @@ function Footer({setPage}) {
             <div style={{fontSize:9,fontWeight:700,color:T.textMuted,letterSpacing:"0.16em",textTransform:"uppercase",marginBottom:14}}>{h}</div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {l.map(x=>(
-                <span key={x} style={{fontSize:12,color:T.textMid,cursor:"pointer",transition:"color .13s"}}
+                <span key={x} onClick={()=>FOOTER_NAV[x]&&setPage(FOOTER_NAV[x])}
+                  style={{fontSize:12,color:T.textMid,cursor:"pointer",transition:"color .13s"}}
                   onMouseEnter={e=>e.target.style.color=T.emerald}
                   onMouseLeave={e=>e.target.style.color=T.textMid}>{x}</span>
               ))}
@@ -2335,6 +2395,14 @@ export default function App() {
   const [profile,setProfile]         = useState(defaultProfile);
   const [profileOpen,setProfileOpen] = useState(false);
   const [notifBanner,setNotifBanner] = useState(null);
+
+  // localStorage persistence
+  useEffect(()=>{ try{const v=localStorage.getItem("dz_cart"); if(v) setCart(JSON.parse(v));} catch(_){} },[]);
+  useEffect(()=>{ try{localStorage.setItem("dz_cart",JSON.stringify(cart));} catch(_){} },[cart]);
+  useEffect(()=>{ try{const v=localStorage.getItem("dz_wish"); if(v) setWishlist(JSON.parse(v));} catch(_){} },[]);
+  useEffect(()=>{ try{localStorage.setItem("dz_wish",JSON.stringify(wishlist));} catch(_){} },[wishlist]);
+  useEffect(()=>{ try{const v=localStorage.getItem("dz_profile"); if(v) setProfile(JSON.parse(v));} catch(_){} },[]);
+  useEffect(()=>{ try{localStorage.setItem("dz_profile",JSON.stringify(profile));} catch(_){} },[profile]);
 
   const cartCount = Object.values(cart).reduce((s,v)=>s+(v||0),0);
 
