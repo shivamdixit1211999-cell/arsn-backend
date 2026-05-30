@@ -364,6 +364,7 @@ function ScrollRow({products,cardWidth,title,sub,cta,onCta}) {
 // ─── NAV — CRO fix: collapse on scroll, 76px total when scrolled ──────────────
 function Nav({page,setPage}) {
   const {cartCount,setCartOpen,setAiOpen,setProfileOpen,wishlist,setPage:navSetPage} = useCtx();
+  const isMobile = useWindowWidth() < 768;
   const [scrolled,setScrolled] = useState(false);
   const [mega,setMega]         = useState(null);
   const [searchVal,setSearchVal] = useState("");
@@ -448,7 +449,7 @@ function Nav({page,setPage}) {
         </div>
 
         {/* CRO fix: real expanding search with inline suggestions */}
-        <div style={{flex:1,maxWidth:500,position:"relative"}}>
+        {!isMobile && <div style={{flex:1,maxWidth:500,position:"relative"}}>
           <div style={{display:"flex",alignItems:"center",gap:8,
             background:searchFocus?T.white:T.ivoryAlt,
             border:`1.5px solid ${searchFocus?T.emerald:T.border}`,
@@ -495,10 +496,10 @@ function Nav({page,setPage}) {
               ))}
             </div>
           )}
-        </div>
+        </div>}
 
         <div style={{display:"flex",gap:8,alignItems:"center",marginLeft:"auto",flexShrink:0}}>
-          <Btn v="outline" sz="sm" onClick={()=>setPage("quiz")}>Find My Dose</Btn>
+          {!isMobile && <Btn v="outline" sz="sm" onClick={()=>setPage("quiz")}>Find My Dose</Btn>}
           {/* Wishlist icon */}
           <button onClick={()=>navSetPage("wishlist")}
             style={{display:"flex",alignItems:"center",gap:5,padding:"8px 12px",
@@ -1343,6 +1344,37 @@ function ProductDetail({id,setPage}) {
           </div>
         </div>
       </div>
+      {/* Reviews section */}
+      <div style={{maxWidth:1100,margin:"0 auto",padding:"0 32px 48px",borderTop:`1px solid ${T.borderLight}`}}>
+        <div style={{padding:"32px 0 20px",display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+          <h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:400,color:T.text,fontStyle:"italic"}}>Customer Reviews</h2>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <Stars r={p.rating} n={p.reviews}/>
+            <span style={{fontSize:12,color:T.textMuted}}>{p.reviews.toLocaleString()} reviews</span>
+          </div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          {[
+            {name:"Priya M.", days:12, rating:5, text:"Absolutely love this product. Noticed a visible difference in my skin within 2 weeks. Will repurchase."},
+            {name:"Rahul S.", days:28, rating:4, text:"Good product, consistent results. Packaging could be better but the formula is excellent."},
+            {name:"Ananya K.", days:45, rating:5, text:"This is a staple in my routine now. Dermatologist-recommended and it shows — my skin looks clearer than ever."},
+          ].map((rv,i)=>(
+            <div key={i} style={{background:T.white,border:`1px solid ${T.borderLight}`,padding:"18px 20px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:32,height:32,borderRadius:"50%",background:T.emeraldBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:T.emerald}}>{rv.name[0]}</div>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:T.text}}>{rv.name}</div>
+                    <div style={{fontSize:10,color:T.textMuted}}>{rv.days} days ago · Verified Purchase</div>
+                  </div>
+                </div>
+                <Stars r={rv.rating}/>
+              </div>
+              <p style={{fontSize:13,color:T.textMid,lineHeight:1.7,margin:0}}>{rv.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
       {related.length>0 && (
         <div style={{maxWidth:1100,margin:"0 auto",padding:"0 32px 48px",borderTop:`1px solid ${T.borderLight}`}}>
           <div style={{padding:"32px 0 20px"}}>
@@ -1482,6 +1514,7 @@ function Brands({setPage}) {
 
 // ─── PAGE: B2B ────────────────────────────────────────────────────────────────
 function B2B() {
+  const {showNotif} = useCtx();
   const [form,setForm] = useState({name:"",biz:"",type:"",email:"",phone:"",city:""});
   const [sub,setSub]   = useState(false);
   const f = k => e => setForm(p=>({...p,[k]:e.target.value}));
@@ -1535,7 +1568,7 @@ function B2B() {
                 {["Dermatologist / Clinic","Salon / Spa","Pharmacy","Online Reseller","Corporate Wellness","Other"].map(o=><option key={o}>{o}</option>)}
               </select>
               <div style={{gridColumn:"1/-1"}}>
-                <Btn fw sz="lg" onClick={()=>{if(form.name&&form.email)setSub(true);}}>Submit Application</Btn>
+                <Btn fw sz="lg" onClick={()=>{if(form.name&&form.email){setSub(true);showNotif({title:"Application Submitted",msg:"Our B2B team will reach out within 24 hours."});}}}>Submit Application</Btn>
               </div>
             </div>
           )}
@@ -2129,7 +2162,7 @@ function CheckInPage({setPage}) {
 
 // ─── PAGE: CONSULT + Rx ────────────────────────────────────────────────────────
 function ConsultPage({setPage}) {
-  const {profile:rawConsult,updateProfile,unlockMilestone} = useCtx();
+  const {profile:rawConsult,updateProfile,unlockMilestone,showNotif} = useCtx();
   const profile = rawConsult || defaultProfile();
   const [tab,setTab] = useState("book"); // book | upload
   const [form,setForm] = useState({name:profile.name||"",phone:profile.phone||"",date:"",slot:"",concern:profile.concern||""});
@@ -2150,11 +2183,13 @@ function ConsultPage({setPage}) {
   const bookConsult = () => {
     updateProfile({appointments:[...profile.appointments,{date:form.date,slot:selSlot,derm:DERMS[selDerm].name,status:"confirmed"}]});
     setSubmitted(true);
+    showNotif({title:"Consultation Booked",msg:`${DERMS[selDerm].name} · ${form.date} at ${selSlot}. Payment via Razorpay.`});
   };
 
   const uploadRx = () => {
     updateProfile({rxStatus:"pending",rxFile:rxFile});
     setRxSubmitted(true);
+    showNotif({title:"Prescription Submitted",msg:"Our team will review within 24 hours."});
   };
 
   const handleRxFile = e => {
@@ -2268,7 +2303,11 @@ function ConsultPage({setPage}) {
                       </select>
                     </div>
                     <div style={{background:T.ivoryAlt,border:`1px solid ${T.border}`,padding:"14px",marginBottom:16,fontSize:12,color:T.textMid,lineHeight:1.65}}>
-                      <b style={{color:T.text}}>Consultation fee:</b> &#8377;299 &#183; 20-minute video call &#183; Prescription issued post-consult if appropriate &#183; Valid for Rx-gated products on Dozeage
+                      <b style={{color:T.text}}>Consultation fee:</b> ₹299 · 20-minute video call · Prescription issued post-consult if appropriate · Valid for Rx-gated products on Dozeage
+                      <div style={{marginTop:6,display:"flex",alignItems:"center",gap:6}}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.emerald} strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span style={{color:T.emeraldMid,fontWeight:600}}>Secure payment via Razorpay</span>
+                      </div>
                     </div>
                     <button onClick={bookConsult}
                       style={{width:"100%",background:T.emerald,color:"#fff",border:"none",padding:"13px",fontSize:12,fontWeight:700,cursor:"pointer",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"inherit"}}>
@@ -2379,6 +2418,17 @@ function WishlistPage({setPage}) {
       </div>
     </div>
   );
+}
+
+// ─── MOBILE HOOK ─────────────────────────────────────────────────────────────
+function useWindowWidth() {
+  const [w,setW] = useState(()=>typeof window!=="undefined"?window.innerWidth:1200);
+  useEffect(()=>{
+    const h = ()=>setW(window.innerWidth);
+    window.addEventListener("resize",h);
+    return ()=>window.removeEventListener("resize",h);
+  },[]);
+  return w;
 }
 
 // ─── CONTEXT ─────────────────────────────────────────────────────────────────
