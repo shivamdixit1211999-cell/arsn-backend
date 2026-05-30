@@ -363,7 +363,7 @@ function ScrollRow({products,cardWidth,title,sub,cta,onCta}) {
 
 // ─── NAV — CRO fix: collapse on scroll, 76px total when scrolled ──────────────
 function Nav({page,setPage}) {
-  const {cartCount,setCartOpen,setAiOpen,setProfileOpen,wishlist,setPage:navSetPage} = useCtx();
+  const {cartCount,setCartOpen,setAiOpen,setProfileOpen,wishlist,setPage:navSetPage,user,setAuthOpen} = useCtx();
   const isMobile = useWindowWidth() < 768;
   const [scrolled,setScrolled] = useState(false);
   const [mega,setMega]         = useState(null);
@@ -418,15 +418,18 @@ function Nav({page,setPage}) {
           alignItems:"center",fontSize:11,color:"rgba(255,255,255,.65)",letterSpacing:"0.05em"}}>
           <span style={{fontWeight:400}}>Free delivery above ₹499 &middot; Pan India</span>
           <div style={{display:"flex",gap:20}}>
-            {["B2B / Wholesale","Sign In"].map(l=>(
-              <span key={l}
-                onClick={()=>l==="B2B / Wholesale"&&setPage("b2b")}
-                style={{cursor:"pointer",transition:"color .15s",fontWeight:500}}
-                onMouseEnter={e=>e.target.style.color="#fff"}
-                onMouseLeave={e=>e.target.style.color="rgba(255,255,255,.65)"}>
-                {l}
-              </span>
-            ))}
+            <span onClick={()=>setPage("b2b")}
+              style={{cursor:"pointer",transition:"color .15s",fontWeight:500}}
+              onMouseEnter={e=>e.target.style.color="#fff"}
+              onMouseLeave={e=>e.target.style.color="rgba(255,255,255,.65)"}>
+              B2B / Wholesale
+            </span>
+            <span onClick={()=>user?setPage("account"):setAuthOpen(true)}
+              style={{cursor:"pointer",transition:"color .15s",fontWeight:600,color:user?"#fff":"rgba(255,255,255,.65)"}}
+              onMouseEnter={e=>e.target.style.color="#fff"}
+              onMouseLeave={e=>e.target.style.color=user?"#fff":"rgba(255,255,255,.65)"}>
+              {user?`Hi, ${user.name.split(" ")[0]}`:"Sign In"}
+            </span>
           </div>
         </div>
       </div>
@@ -677,7 +680,7 @@ function AOVBar({subtotal}) {
 
 // ─── CART DRAWER ──────────────────────────────────────────────────────────────
 function CartDrawer() {
-  const {cart,setCart,cartOpen,setCartOpen} = useCtx();
+  const {cart,setCart,cartOpen,setCartOpen,setPage:drawerSetPage} = useCtx();
   const items    = ALL.filter(p=>cart[p.id]>0);
   const subtotal = items.reduce((s,p)=>s+p.price*cart[p.id],0);
   const savings  = items.reduce((s,p)=>s+(p.mrp-p.price)*cart[p.id],0);
@@ -753,7 +756,7 @@ function CartDrawer() {
               <span style={{fontSize:11,color:T.textMuted,letterSpacing:"0.08em",textTransform:"uppercase"}}>Subtotal</span>
               <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:600}}>₹{subtotal.toLocaleString()}</span>
             </div>
-            <Btn fw sz="lg" onClick={()=>window.location.href='/checkout'}>Proceed to Checkout -&gt;</Btn>
+            <Btn fw sz="lg" onClick={()=>{setCartOpen(false);drawerSetPage("checkout");}}>Proceed to Checkout -&gt;</Btn>
             <div style={{textAlign:"center",fontSize:11,color:T.textMuted,marginTop:8}}>
               Free delivery &middot; Easy returns &middot; 100% authentic
             </div>
@@ -2406,6 +2409,290 @@ function Footer({setPage}) {
 }
 
 
+// ─── AUTH MODAL ───────────────────────────────────────────────────────────────
+function AuthModal() {
+  const {authOpen,setAuthOpen,setUser,showNotif,updateProfile} = useCtx();
+  const [tab,setTab] = useState("signin");
+  const [form,setForm] = useState({name:"",email:"",password:"",phone:""});
+  const f = k => e => setForm(p=>({...p,[k]:e.target.value}));
+  const inp = {background:T.white,border:`1.5px solid ${T.border}`,padding:"11px 13px",
+    fontSize:13,outline:"none",color:T.text,fontFamily:"inherit",width:"100%",transition:"border-color .15s"};
+  const submit = () => {
+    if(!form.email||!form.password) return;
+    const u = {name:form.name||form.email.split("@")[0],email:form.email,phone:form.phone,joinedAt:new Date().toISOString()};
+    setUser(u); updateProfile({name:u.name,email:u.email,phone:u.phone});
+    setAuthOpen(false); setForm({name:"",email:"",password:"",phone:""});
+    showNotif({title:tab==="signup"?"Account Created!":"Welcome back!",msg:`Signed in as ${u.name}`});
+  };
+  if(!authOpen) return null;
+  return (
+    <>
+      <div onClick={()=>setAuthOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:1500,backdropFilter:"blur(4px)"}}/>
+      <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",
+        zIndex:1600,background:T.ivory,width:"min(440px,95vw)",boxShadow:`0 24px 64px ${T.shadowMd}`,
+        animation:"fadeUp .25s ease"}}>
+        <div style={{padding:"22px 28px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:500,fontStyle:"italic",color:T.text}}>
+            {tab==="signin"?"Welcome Back":"Create Account"}
+          </div>
+          <button onClick={()=>setAuthOpen(false)} style={{background:"none",border:"none",fontSize:22,color:T.textMuted,cursor:"pointer",fontFamily:"inherit",lineHeight:1}}>×</button>
+        </div>
+        <div style={{display:"flex",borderBottom:`1px solid ${T.border}`}}>
+          {[["signin","Sign In"],["signup","New Account"]].map(([v,l])=>(
+            <button key={v} onClick={()=>setTab(v)} style={{flex:1,background:"none",border:"none",padding:"12px",fontSize:11,fontWeight:tab===v?700:500,color:tab===v?T.emerald:T.textMid,borderBottom:`2px solid ${tab===v?T.emerald:"transparent"}`,cursor:"pointer",letterSpacing:"0.08em",textTransform:"uppercase",transition:"all .12s",fontFamily:"inherit",marginBottom:-1}}>{l}</button>
+          ))}
+        </div>
+        <div style={{padding:"22px 28px",display:"flex",flexDirection:"column",gap:11}}>
+          {tab==="signup"&&<input value={form.name} onChange={f("name")} placeholder="Full name" style={inp} onFocus={e=>e.target.style.borderColor=T.emerald} onBlur={e=>e.target.style.borderColor=T.border}/>}
+          <input value={form.email} onChange={f("email")} placeholder="Email address" type="email" style={inp} onFocus={e=>e.target.style.borderColor=T.emerald} onBlur={e=>e.target.style.borderColor=T.border}/>
+          {tab==="signup"&&<input value={form.phone} onChange={f("phone")} placeholder="Phone number" type="tel" style={inp} onFocus={e=>e.target.style.borderColor=T.emerald} onBlur={e=>e.target.style.borderColor=T.border}/>}
+          <input value={form.password} onChange={f("password")} placeholder="Password" type="password" style={inp} onFocus={e=>e.target.style.borderColor=T.emerald} onBlur={e=>e.target.style.borderColor=T.border}/>
+          {tab==="signin"&&<div style={{textAlign:"right"}}><span style={{fontSize:11,color:T.emeraldMid,cursor:"pointer",fontWeight:600}}>Forgot password?</span></div>}
+          <Btn fw sz="lg" onClick={submit}>{tab==="signin"?"Sign In →":"Create Account →"}</Btn>
+          <div style={{display:"flex",alignItems:"center",gap:12,margin:"2px 0"}}>
+            <div style={{flex:1,height:1,background:T.border}}/><span style={{fontSize:11,color:T.textMuted,whiteSpace:"nowrap"}}>or continue with</span><div style={{flex:1,height:1,background:T.border}}/>
+          </div>
+          <button onClick={submit} style={{width:"100%",background:T.white,border:`1.5px solid ${T.border}`,padding:"11px",fontSize:12,fontWeight:600,color:T.textMid,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"inherit",transition:"all .14s"}}
+            onMouseEnter={e=>e.currentTarget.style.borderColor=T.emerald} onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+            <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Continue with Google
+          </button>
+          <div style={{textAlign:"center",fontSize:10,color:T.textMuted}}>By continuing you agree to our Terms &amp; Privacy Policy</div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── ACCOUNT PAGE ─────────────────────────────────────────────────────────────
+function AccountPage({setPage}) {
+  const {user,setUser,profile,showNotif} = useCtx();
+  if(!user) { return null; }
+  const signOut = () => {
+    setUser(null);
+    try{localStorage.removeItem("dz_user");}catch(_){}
+    showNotif({title:"Signed out",msg:"See you soon!"});
+    setPage("home");
+  };
+  const totalPts = profile?.milestones?.reduce((s,m)=>s+m.pts,0)||0;
+  return (
+    <div style={{paddingBottom:120,background:T.ivory,minHeight:"100vh"}}>
+      <div style={{background:T.emerald,padding:"36px 32px"}}>
+        <div style={{maxWidth:1100,margin:"0 auto",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:16}}>
+          <div>
+            <div style={{fontSize:9,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:"0.18em",textTransform:"uppercase",marginBottom:8}}>My Account</div>
+            <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(24px,4vw,40px)",fontWeight:400,color:"#fff",fontStyle:"italic"}}>{user.name}</h1>
+            <div style={{fontSize:13,color:"rgba(255,255,255,.6)",marginTop:4}}>{user.email}{user.phone&&` · ${user.phone}`}</div>
+          </div>
+          <button onClick={signOut} style={{background:"rgba(255,255,255,.15)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",padding:"10px 20px",fontSize:11,fontWeight:700,cursor:"pointer",textTransform:"uppercase",letterSpacing:"0.08em",fontFamily:"inherit"}}>Sign Out</button>
+        </div>
+      </div>
+      <div style={{maxWidth:1100,margin:"0 auto",padding:"32px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14,marginBottom:28}}>
+          {[["Orders","0","All time"],["Wishlist",profile?.milestones?.length||0,"milestones"],["Points",totalPts,"earned"]].map(([l,v,u])=>(
+            <div key={l} style={{background:T.white,border:`1px solid ${T.border}`,padding:"22px"}}>
+              <div style={{fontSize:9,color:T.textMuted,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:8}}>{l}</div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:34,fontWeight:600,color:T.text}}>{v}</div>
+              <div style={{fontSize:11,color:T.textMuted,marginTop:2}}>{u}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,padding:"24px",marginBottom:20}}>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:400,color:T.text,fontStyle:"italic",marginBottom:16}}>Order History</div>
+          <div style={{padding:"40px 0",textAlign:"center"}}>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:T.textMuted,fontStyle:"italic",marginBottom:8}}>No orders yet</div>
+            <div style={{fontSize:12,color:T.textMuted,marginBottom:18}}>Your order history will appear here after your first purchase</div>
+            <Btn onClick={()=>setPage("skin")}>Start Shopping</Btn>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <Btn v="outline" onClick={()=>setPage("myskin")}>Skin Profile →</Btn>
+          <Btn v="outline" onClick={()=>setPage("wishlist")}>Wishlist →</Btn>
+          <Btn v="outline" onClick={()=>setPage("consult")}>Book Consult →</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CHECKOUT PAGE ────────────────────────────────────────────────────────────
+function CheckoutPage({setPage}) {
+  const {cart,setCart,profile,user,showNotif} = useCtx();
+  const [step,setStep] = useState("summary");
+  const [addr,setAddr] = useState({name:profile?.name||user?.name||"",phone:profile?.phone||user?.phone||"",line1:"",line2:"",city:"",state:"",pin:""});
+  const items = ALL.filter(p=>cart[p.id]>0);
+  const subtotal = items.reduce((s,p)=>s+p.price*cart[p.id],0);
+  const delivery = subtotal>=499?0:49;
+  const total = subtotal+delivery;
+  const savings = items.reduce((s,p)=>s+(p.mrp-p.price)*cart[p.id],0);
+  const af = k => e => setAddr(p=>({...p,[k]:e.target.value}));
+  const inp = {background:T.white,border:`1.5px solid ${T.border}`,padding:"11px 13px",fontSize:13,outline:"none",color:T.text,fontFamily:"inherit",width:"100%",transition:"border-color .15s"};
+  const STEPS = ["summary","address","payment"];
+  const stepLabel = {summary:"Order Summary",address:"Delivery Address",payment:"Payment"};
+  const placeOrder = () => { try{localStorage.removeItem("dz_cart");}catch(_){} setCart({}); setPage("order-confirm"); };
+
+  if(items.length===0&&step==="summary") return (
+    <div style={{paddingTop:160,textAlign:"center",paddingBottom:120}}>
+      <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:T.textMuted,fontStyle:"italic",marginBottom:16}}>Your bag is empty</div>
+      <Btn onClick={()=>setPage("home")}>Continue Shopping</Btn>
+    </div>
+  );
+
+  return (
+    <div style={{paddingBottom:120,background:T.ivory,minHeight:"100vh"}}>
+      {/* Promo banner */}
+      <div style={{background:T.emerald,padding:"10px 32px",textAlign:"center"}}>
+        <span style={{fontSize:12,fontWeight:600,color:"#fff",letterSpacing:"0.04em"}}>
+          {delivery===0?"✓ Free delivery on this order · ":"Add ₹"+(499-subtotal)+" more for free delivery · "}
+          {savings>0?`You're saving ₹${savings.toLocaleString()} on this order`:"100% Authentic Products"}
+        </span>
+      </div>
+      {/* Step indicator */}
+      <div style={{background:T.white,borderBottom:`1px solid ${T.border}`,padding:"14px 32px"}}>
+        <div style={{maxWidth:860,margin:"0 auto",display:"flex",alignItems:"center"}}>
+          {STEPS.map((s,i)=>(
+            <div key={s} style={{display:"flex",alignItems:"center",flex:i<STEPS.length-1?1:undefined}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,cursor:i<STEPS.indexOf(step)?"pointer":"default"}}
+                onClick={()=>i<STEPS.indexOf(step)&&setStep(s)}>
+                <div style={{width:24,height:24,borderRadius:"50%",flexShrink:0,background:STEPS.indexOf(step)>=i?T.emerald:T.ivoryDark,color:STEPS.indexOf(step)>=i?"#fff":T.textMuted,fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{i+1}</div>
+                <span style={{fontSize:11,fontWeight:step===s?700:500,color:step===s?T.emerald:T.textMuted,textTransform:"uppercase",letterSpacing:"0.08em",whiteSpace:"nowrap"}}>{stepLabel[s]}</span>
+              </div>
+              {i<STEPS.length-1&&<div style={{flex:1,height:1,background:T.border,margin:"0 10px"}}/>}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{maxWidth:860,margin:"0 auto",padding:"28px 32px",display:"grid",gridTemplateColumns:"1fr 300px",gap:24,alignItems:"start"}}>
+        <div>
+          {/* Summary */}
+          {step==="summary"&&(
+            <div style={{background:T.white,border:`1px solid ${T.border}`,padding:"24px"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:400,color:T.text,fontStyle:"italic",marginBottom:18}}>Your Order ({items.length} item{items.length!==1?"s":""})</div>
+              {items.map(p=>(
+                <div key={p.id} style={{display:"flex",gap:14,padding:"14px 0",borderBottom:`1px solid ${T.borderLight}`}}>
+                  <div style={{width:60,height:60,background:p.bg,flexShrink:0,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <div style={{width:24,height:36,background:"rgba(255,255,255,.7)",border:"1px solid rgba(255,255,255,.9)"}}/>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:9,color:T.gold,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:2}}>{p.brand}</div>
+                    <div style={{fontSize:13,fontWeight:600,color:T.text,marginBottom:3}}>{p.name}</div>
+                    <div style={{fontSize:10,color:T.textMuted,letterSpacing:"0.05em",marginBottom:4}}>SKU: DZ-{String(p.id).padStart(4,"0")} &nbsp;·&nbsp; {p.sub} &nbsp;·&nbsp; Qty: {cart[p.id]}</div>
+                    {p.mrp>p.price&&<span style={{fontSize:10,color:T.emeraldMid,fontWeight:600}}>Save ₹{((p.mrp-p.price)*cart[p.id]).toLocaleString()}</span>}
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontSize:15,fontWeight:700}}>₹{(p.price*cart[p.id]).toLocaleString()}</div>
+                    {p.mrp>p.price&&<div style={{fontSize:11,color:T.textMuted,textDecoration:"line-through"}}>₹{(p.mrp*cart[p.id]).toLocaleString()}</div>}
+                  </div>
+                </div>
+              ))}
+              <div style={{marginTop:18}}><Btn fw sz="lg" onClick={()=>setStep("address")}>Continue to Delivery →</Btn></div>
+            </div>
+          )}
+          {/* Address */}
+          {step==="address"&&(
+            <div style={{background:T.white,border:`1px solid ${T.border}`,padding:"24px"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:400,color:T.text,fontStyle:"italic",marginBottom:18}}>Delivery Address</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                {[["name","Full name","text"],["phone","Phone number","tel"],["line1","Address line 1","text"],["line2","Apartment, area (optional)","text"],["city","City","text"],["state","State","text"]].map(([k,ph,t])=>(
+                  <input key={k} value={addr[k]} onChange={af(k)} placeholder={ph} type={t} style={{...inp,gridColumn:k==="line1"||k==="line2"?"1/-1":undefined}}
+                    onFocus={e=>e.target.style.borderColor=T.emerald} onBlur={e=>e.target.style.borderColor=T.border}/>
+                ))}
+                <input value={addr.pin} onChange={af("pin")} placeholder="PIN code" maxLength={6} style={inp}
+                  onFocus={e=>e.target.style.borderColor=T.emerald} onBlur={e=>e.target.style.borderColor=T.border}/>
+              </div>
+              <div style={{marginTop:16}}><Btn fw sz="lg" onClick={()=>{if(addr.name&&addr.line1&&addr.city&&addr.pin)setStep("payment");else showNotif({title:"Incomplete address",msg:"Please fill all required fields"});}}>Continue to Payment →</Btn></div>
+            </div>
+          )}
+          {/* Payment */}
+          {step==="payment"&&(
+            <div style={{background:T.white,border:`1px solid ${T.border}`,padding:"24px"}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:400,color:T.text,fontStyle:"italic",marginBottom:18}}>Payment Method</div>
+              <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
+                {[["razorpay","Pay via Razorpay","UPI · Cards · NetBanking · Wallets","Recommended"],["cod","Cash on Delivery","Pay when your order arrives","+₹30 handling"]].map(([id,label,sub,note],i)=>(
+                  <div key={id} style={{background:i===0?T.emeraldBg:T.ivoryAlt,border:`1.5px solid ${i===0?T.emerald:T.border}`,padding:"16px",display:"flex",gap:12,alignItems:"center",cursor:"pointer"}}>
+                    <div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${i===0?T.emerald:T.border}`,background:i===0?T.emerald:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {i===0&&<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>}
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:T.text}}>{label}</div>
+                      <div style={{fontSize:11,color:T.textMuted}}>{sub}</div>
+                    </div>
+                    <span style={{fontSize:10,fontWeight:700,color:i===0?T.emerald:T.textMuted}}>{note}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{background:T.emeraldBg,border:`1px solid ${T.emeraldLight}44`,padding:"11px 14px",marginBottom:18,display:"flex",alignItems:"center",gap:8}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.emerald} strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span style={{fontSize:11,color:T.emeraldMid,fontWeight:600}}>100% secure · SSL encrypted · Powered by Razorpay</span>
+              </div>
+              <Btn fw sz="lg" onClick={placeOrder}>Pay ₹{total.toLocaleString()} →</Btn>
+            </div>
+          )}
+        </div>
+        {/* Order sidebar */}
+        <div style={{background:T.white,border:`1px solid ${T.border}`,padding:"20px",position:"sticky",top:150}}>
+          <div style={{fontSize:10,fontWeight:700,color:T.textMuted,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:14}}>Order Summary</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:14,paddingBottom:14,borderBottom:`1px solid ${T.borderLight}`}}>
+            {items.map(p=>(
+              <div key={p.id} style={{display:"flex",gap:8,alignItems:"center"}}>
+                <div style={{width:30,height:30,background:p.bg,flexShrink:0,border:`1px solid ${T.border}`}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:11,fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                  <div style={{fontSize:10,color:T.textMuted}}>×{cart[p.id]}</div>
+                </div>
+                <span style={{fontSize:12,fontWeight:700,flexShrink:0}}>₹{(p.price*cart[p.id]).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+          {[["Subtotal",`₹${subtotal.toLocaleString()}`],["Delivery",delivery===0?"FREE ✓":`₹${delivery}`],savings>0?["You save",`-₹${savings.toLocaleString()}`]:null].filter(Boolean).map(([l,v])=>(
+            <div key={l} style={{display:"flex",justifyContent:"space-between",marginBottom:7}}>
+              <span style={{fontSize:12,color:T.textMuted}}>{l}</span>
+              <span style={{fontSize:12,fontWeight:600,color:l==="You save"?T.emeraldMid:l==="Delivery"&&delivery===0?T.emeraldMid:T.text}}>{v}</span>
+            </div>
+          ))}
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:12,paddingTop:12,borderTop:`1px solid ${T.border}`}}>
+            <span style={{fontSize:13,fontWeight:700}}>Total</span>
+            <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,fontWeight:600}}>₹{total.toLocaleString()}</span>
+          </div>
+          {savings>0&&<div style={{background:T.emeraldBg,padding:"8px 10px",marginTop:10,fontSize:11,color:T.emeraldMid,fontWeight:700,textAlign:"center"}}>You save ₹{savings.toLocaleString()} 🎉</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ORDER CONFIRM PAGE ───────────────────────────────────────────────────────
+function OrderConfirmPage({setPage}) {
+  const {profile,user} = useCtx();
+  const orderNum = useMemo(()=>"DZ"+Date.now().toString().slice(-6),[]);
+  const name = profile?.name||user?.name||"there";
+  const expectedDate = new Date(Date.now()+4*86400000).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long"});
+  return (
+    <div style={{paddingBottom:120,background:T.ivory,minHeight:"100vh"}}>
+      <div style={{maxWidth:580,margin:"0 auto",padding:"64px 32px",textAlign:"center"}}>
+        <div style={{width:72,height:72,borderRadius:"50%",background:T.emeraldBg,border:`2px solid ${T.emeraldLight}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 24px"}}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={T.emerald} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(28px,4vw,42px)",fontWeight:400,color:T.text,fontStyle:"italic",marginBottom:8}}>Order Placed!</div>
+        <div style={{fontSize:14,color:T.textMuted,marginBottom:28,lineHeight:1.7}}>Thank you, <b style={{color:T.text}}>{name}</b>. Your order <b style={{color:T.text}}>#{orderNum}</b> is confirmed and being prepared.</div>
+        <div style={{background:T.white,border:`1px solid ${T.border}`,padding:"20px 24px",marginBottom:28,display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,textAlign:"left"}}>
+          {[["Order ID","#"+orderNum],["Expected Delivery",expectedDate],["Payment","Razorpay · Confirmed"],["Status","Being Prepared ✓"]].map(([l,v])=>(
+            <div key={l}>
+              <div style={{fontSize:9,fontWeight:700,color:T.textMuted,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:4}}>{l}</div>
+              <div style={{fontSize:13,fontWeight:600,color:T.text}}>{v}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{fontSize:12,color:T.textMuted,marginBottom:24}}>You'll receive a confirmation on WhatsApp &amp; email shortly.</div>
+        <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+          <Btn onClick={()=>setPage("home")}>Continue Shopping</Btn>
+          <Btn v="outline" onClick={()=>setPage("account")}>My Orders</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WishlistPage({setPage}) {
   const {wishlist,addCart,cart} = useCtx();
   const items = ALL.filter(p=>wishlist.includes(p.id));
@@ -2457,11 +2744,14 @@ export default function App() {
   const [profile,setProfile]         = useState(()=>{ try{const v=localStorage.getItem("dz_profile");return v?JSON.parse(v):defaultProfile();}catch{return defaultProfile();} });
   const [profileOpen,setProfileOpen] = useState(false);
   const [notifBanner,setNotifBanner] = useState(null);
+  const [user,setUser]               = useState(()=>{ try{const v=localStorage.getItem("dz_user");return v?JSON.parse(v):null;}catch{return null;} });
+  const [authOpen,setAuthOpen]       = useState(false);
 
   // Persist on change
   useEffect(()=>{ try{localStorage.setItem("dz_cart",JSON.stringify(cart));}catch(_){} },[cart]);
   useEffect(()=>{ try{localStorage.setItem("dz_wish",JSON.stringify(wishlist));}catch(_){} },[wishlist]);
   useEffect(()=>{ try{localStorage.setItem("dz_profile",JSON.stringify(profile));}catch(_){} },[profile]);
+  useEffect(()=>{ try{localStorage.setItem("dz_user",JSON.stringify(user));}catch(_){} },[user]);
 
   const cartCount = Object.values(cart).reduce((s,v)=>s+(v||0),0);
 
@@ -2499,7 +2789,10 @@ export default function App() {
     if(page==="myskin")   return <MySkinPage setPage={setPage}/>;
     if(page==="checkin")  return <CheckInPage setPage={setPage}/>;
     if(page==="consult")  return <ConsultPage setPage={setPage}/>;
-    if(page==="wishlist") return <WishlistPage setPage={setPage}/>;
+    if(page==="wishlist")      return <WishlistPage setPage={setPage}/>;
+    if(page==="account")       return <AccountPage setPage={setPage}/>;
+    if(page==="checkout")      return <CheckoutPage setPage={setPage}/>;
+    if(page==="order-confirm") return <OrderConfirmPage setPage={setPage}/>;
     if(page.startsWith("search/"))  return <Search query={page.split("/").slice(1).join("/")} />;
     if(page.startsWith("product/")) return <ProductDetail id={page.split("/")[1]} setPage={setPage}/>;
     return <Catalog cat={page}/>;
@@ -2510,6 +2803,7 @@ export default function App() {
       cart,setCart,addCart,cartCount,cartOpen,setCartOpen,aiOpen,setAiOpen,
       wishlist,toggleWish,profile,updateProfile,profileOpen,setProfileOpen,
       unlockMilestone,notifBanner,showNotif,setPage,
+      user,setUser,authOpen,setAuthOpen,
     }}>
       <style>{GLOBAL_CSS}</style>
       <Nav page={page} setPage={setPage}/>
@@ -2519,6 +2813,7 @@ export default function App() {
       <AIBar/>
       <NotifBanner/>
       <ProfileDrawer setPage={setPage}/>
+      <AuthModal/>
       <a href="https://wa.me/919876543210" target="_blank" rel="noreferrer"
         style={{position:"fixed",right:20,bottom:72,zIndex:699,background:"#25D366",
           color:"#fff",width:46,height:46,borderRadius:"50%",display:"flex",
