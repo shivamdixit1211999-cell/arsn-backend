@@ -296,6 +296,87 @@ app.post("/api/products", async (req, res) => {
   res.json(data);
 });
 
+// Conversations
+async function getTenant(req, res) {
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  if (!token) { res.status(401).json({ error: "No token" }); return null; }
+  const { data: { user } } = await supabase.auth.getUser(token);
+  if (!user) { res.status(401).json({ error: "Invalid token" }); return null; }
+  const { data: member } = await supabase.from("tenant_members").select("tenant_id").eq("user_id", user.id).single();
+  if (!member) { res.status(403).json({ error: "No tenant" }); return null; }
+  return member.tenant_id;
+}
+
+// List conversations with lead info + last message preview
+app.get("/api/conversations", async (req, res) => {
+  const tid = await getTenant(req, res);
+  if (!tid) return;
+
+  const { data: convs, error } = await supabase
+    .from("conversations")
+    .select("id, is_ai_active, created_at, lead:leads(id, phone, state, source, last_activity_at)")
+    .eq("tenant_id", tid)
+    .order("created_at", { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Fetch last message for each conversation
+  const withPreviews = await Promise.all((convs || []).map(async (c) => {
+    const { data: msgs } = await supabase
+      .from("messages")
+      .select("role, content, sent_at")
+      .eq("conversation_id", c.id)
+      .order("sent_at", { ascending: false })
+      .limit(1);
+    return { ...c, last_message: msgs?.[0] || null };
+  }));
+
+  res.json({ conversations: withPreviews });
+});
+
+// Get all messages in a conversation
+app.get("/api/conversations/:id/messages", async (req, res) => {
+  const tid = await getTenant(req, res);
+  if (!tid) return;
+
+  const { data: conv } = await supabase
+    .from("conversations")
+    .select("id, is_ai_active, lead:leads(phone, state)")
+    .eq("id", req.params.id)
+    .eq("tenant_id", tid)
+    .single();
+
+  if (!conv) return res.status(404).json({ error: "Conversation not found" });
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("id, role, content, sent_at, wa_message_id")
+    .eq("conversation_id", conv.id)
+    .order("sent_at", { ascending: true });
+
+  res.json({ conversation: conv, messages: messages || [] });
+});
+
+// Toggle AI on/off for a conversation
+app.patch("/api/conversations/:id", async (req, res) => {
+  const tid = await getTenant(req, res);
+  if (!tid) return;
+
+  const { is_ai_active } = req.body;
+  if (typeof is_ai_active !== "boolean") return res.status(400).json({ error: "is_ai_active (boolean) required" });
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .update({ is_ai_active })
+    .eq("id", req.params.id)
+    .eq("tenant_id", tid)
+    .select("id, is_ai_active")
+    .single();
+
+  if (error || !data) return res.status(404).json({ error: "Conversation not found" });
+  res.json(data);
+});
+
 // Admin
 app.get("/api/admin/stats", async (req, res) => {
   const { data: tenants } = await supabase.from("tenants").select("id", { count: "exact" });
