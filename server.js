@@ -16,6 +16,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY || ""
 );
 
+// ─── Startup env validation ───────────────────────────────────────────────────
+const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY", "GROQ_API_KEY"];
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length) {
+  console.error(`Missing required env vars: ${missing.join(", ")}. Exiting.`);
+  process.exit(1);
+}
+
 const GA4_ID     = process.env.GA4_MEASUREMENT_ID || "";
 const PIXEL_ID   = process.env.META_PIXEL_ID || "";
 const CLARITY_ID = process.env.CLARITY_PROJECT_ID || "";
@@ -735,6 +743,56 @@ app.get("/api/analytics", requireAuth, async (req, res) => {
     revenue_total: revenue,
     avg_order_value: converted > 0 ? Math.round(revenue / converted) : 0,
   });
+});
+
+// Orders — list with optional ?status=pending|paid|failed
+app.get("/api/orders", requireAuth, async (req, res) => {
+  const page  = Math.max(1, Number(req.query.page)  || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+  const from  = (page - 1) * limit;
+
+  let query = supabase
+    .from("orders")
+    .select("*, lead:leads(phone, name, state)", { count: "exact" })
+    .eq("tenant_id", req.tenantId);
+  if (req.query.status) query = query.eq("status", req.query.status);
+
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false }).range(from, from + limit - 1);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ orders: data || [], total: count, page, limit });
+});
+
+// Followups — list scheduled and sent for a lead
+app.get("/api/leads/:id/followups", requireAuth, async (req, res) => {
+  const { data: lead } = await supabase
+    .from("leads").select("id").eq("id", req.params.id).eq("tenant_id", req.tenantId).single();
+  if (!lead) return res.status(404).json({ error: "Lead not found" });
+
+  const { data, error } = await supabase
+    .from("followups")
+    .select("id, message, send_at, sent, sent_at, created_at")
+    .eq("lead_id", lead.id)
+    .eq("tenant_id", req.tenantId)
+    .order("send_at", { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ followups: data || [] });
+});
+
+// Cancel a scheduled followup
+app.delete("/api/followups/:id", requireAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from("followups")
+    .select("id, sent")
+    .eq("id", req.params.id)
+    .eq("tenant_id", req.tenantId)
+    .single();
+
+  if (error || !data) return res.status(404).json({ error: "Followup not found" });
+  if (data.sent) return res.status(400).json({ error: "Already sent — cannot cancel" });
+
+  await supabase.from("followups").delete().eq("id", req.params.id);
+  res.json({ ok: true });
 });
 
 // Settings
