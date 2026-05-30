@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, createContext, useContext, useCallback, useMemo } from "react";
+import { fetchAllProducts, shopifyEnabled } from "./shopify.js";
 
 // ─── TOKENS ──────────────────────────────────────────────────────────────────
 // CRO-corrected ratio: ivory dominant (70%), emerald accent (20%), gold reward (10%)
@@ -43,6 +44,7 @@ button,input,select,textarea{font-family:inherit;}
 @keyframes dot{0%,80%,100%{opacity:.3;transform:scale(.65);}40%{opacity:1;transform:scale(1);}}
 @keyframes slideDown{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
 @keyframes pulse{0%,100%{opacity:.6;}50%{opacity:1;}}
+@keyframes spin{to{transform:rotate(360deg);}}
 `;
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
@@ -1743,7 +1745,7 @@ function B2B() {
       <div style={{maxWidth:1140,margin:"0 auto",padding:"48px 32px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:56}}>
         <div>
           <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:500,color:T.text,marginBottom:22,fontStyle:"italic"}}>What We Offer</div>
-          {[["Bulk Supply","Wholesale access to 200+ brands. Min order Rs.5,000. 48-hour pan-India delivery."],["Private Label","Your brand, our formulations. From 500 units. 60-70% gross margin."],["Ordering Panel","WhatsApp-first or web panel. Monthly credit for established partners."],["Demand Intelligence","Trending SKUs by pin code, pre-shared before your next order."],["Marketing Support","Co-branded materials, routine cards, upsell kits included."]].map(([t,d])=>(
+          {[["Bulk Supply","Wholesale access to 200+ brands. Min order ₹5,000. 48-hour pan-India delivery."],["Private Label","Your brand, our formulations. From 500 units. 60-70% gross margin."],["Ordering Panel","WhatsApp-first or web panel. Monthly credit for established partners."],["Demand Intelligence","Trending SKUs by pin code, pre-shared before your next order."],["Marketing Support","Co-branded materials, routine cards, upsell kits included."]].map(([t,d])=>(
             <div key={t} style={{borderBottom:`1px solid ${T.borderLight}`,paddingBottom:14,paddingTop:14}}>
               <div style={{fontSize:13,fontWeight:600,color:T.text,marginBottom:3}}>{t}</div>
               <div style={{fontSize:12,color:T.textMuted,lineHeight:1.65}}>{d}</div>
@@ -2732,7 +2734,11 @@ function CheckoutPage({setPage}) {
   const stepLabel = {summary:"Order Summary",address:"Delivery Address",payment:"Payment"};
   const discount = couponApplied ? Math.round(subtotal*couponApplied.pct/100) : 0;
   const total2 = subtotal + delivery - discount;
-  const placeOrder = () => { try{localStorage.removeItem("dz_cart");}catch(_){} setCart({}); setPage("order-confirm"); };
+  const placeOrder = () => {
+    try{localStorage.setItem("dz_last_pay",payMethod);}catch(_){}
+    try{localStorage.removeItem("dz_cart");}catch(_){}
+    setCart({}); setPage("order-confirm");
+  };
 
   if(items.length===0&&step==="summary") return (
     <div style={{paddingTop:160,textAlign:"center",paddingBottom:120}}>
@@ -2851,7 +2857,7 @@ function CheckoutPage({setPage}) {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.emerald} strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 <span style={{fontSize:11,color:T.emeraldMid,fontWeight:600}}>100% secure · SSL encrypted · Powered by Razorpay</span>
               </div>
-              <Btn fw sz="lg" onClick={placeOrder}>Pay ₹{total2.toLocaleString()} →</Btn>
+              <Btn fw sz="lg" onClick={placeOrder}>{payMethod==="cod"?"Place Order — Pay on Delivery →":`Pay ₹${total2.toLocaleString()} →`}</Btn>
             </div>
           )}
         </div>
@@ -2898,6 +2904,7 @@ function OrderConfirmPage({setPage}) {
   const orderNum = useMemo(()=>"DZ"+Date.now().toString().slice(-6),[]);
   const name = profile?.name||user?.name||"there";
   const expectedDate = getDeliveryDate();
+  const payLabel = (()=>{ try{const v=localStorage.getItem("dz_last_pay");return v==="cod"?"Cash on Delivery":"Razorpay · Confirmed";}catch{return "Confirmed";} })();
   return (
     <div style={{paddingBottom:120,background:T.ivory,minHeight:"100vh"}}>
       <div style={{maxWidth:580,margin:"0 auto",padding:"64px 32px",textAlign:"center"}}>
@@ -2907,7 +2914,7 @@ function OrderConfirmPage({setPage}) {
         <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"clamp(28px,4vw,42px)",fontWeight:400,color:T.text,fontStyle:"italic",marginBottom:8}}>Order Placed!</div>
         <div style={{fontSize:14,color:T.textMuted,marginBottom:28,lineHeight:1.7}}>Thank you, <b style={{color:T.text}}>{name}</b>. Your order <b style={{color:T.text}}>#{orderNum}</b> is confirmed and being prepared.</div>
         <div style={{background:T.white,border:`1px solid ${T.border}`,padding:"20px 24px",marginBottom:28,display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,textAlign:"left"}}>
-          {[["Order ID","#"+orderNum],["Expected Delivery",expectedDate],["Payment","Razorpay · Confirmed"],["Status","Being Prepared ✓"]].map(([l,v])=>(
+          {[["Order ID","#"+orderNum],["Expected Delivery",expectedDate],["Payment",payLabel],["Status","Being Prepared ✓"]].map(([l,v])=>(
             <div key={l}>
               <div style={{fontSize:9,fontWeight:700,color:T.textMuted,letterSpacing:"0.12em",textTransform:"uppercase",marginBottom:4}}>{l}</div>
               <div style={{fontSize:13,fontWeight:600,color:T.text}}>{v}</div>
@@ -2965,8 +2972,14 @@ const Ctx = createContext(null);
 const useCtx = () => useContext(Ctx);
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
+// Module-level products list — starts as the local mock catalog.
+// When VITE_USE_SHOPIFY=true this gets replaced by the Storefront API response.
+let PRODUCTS = ALL;
+
 export default function App() {
   const [page,setPage]               = useState("home");
+  const [productsReady,setProductsReady] = useState(!shopifyEnabled);
+
   // Lazy init: read from localStorage on first render — no flash, no race condition
   const [cart,setCart]               = useState(()=>{ try{return JSON.parse(localStorage.getItem("dz_cart")||"{}");}catch{return {};} });
   const [cartOpen,setCartOpen]       = useState(false);
@@ -2977,6 +2990,12 @@ export default function App() {
   const [notifBanner,setNotifBanner] = useState(null);
   const [user,setUser]               = useState(()=>{ try{const v=localStorage.getItem("dz_user");return v?JSON.parse(v):null;}catch{return null;} });
   const [authOpen,setAuthOpen]       = useState(false);
+
+  // Bootstrap Shopify products when env flag is on
+  useEffect(()=>{
+    if(!shopifyEnabled) return;
+    fetchAllProducts().then(data=>{ if(data){ PRODUCTS=data; } setProductsReady(true); }).catch(()=>setProductsReady(true));
+  },[]);
 
   // Persist on change
   useEffect(()=>{ try{localStorage.setItem("dz_cart",JSON.stringify(cart));}catch(_){} },[cart]);
@@ -3012,6 +3031,12 @@ export default function App() {
   },[]);
 
   const render = () => {
+    if(!productsReady) return (
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"60vh",flexDirection:"column",gap:16}}>
+        <div style={{width:36,height:36,border:`3px solid #E5E0D8`,borderTop:`3px solid #1B4332`,borderRadius:"50%",animation:"spin .7s linear infinite"}}/>
+        <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:16,color:"#8A847A",fontStyle:"italic"}}>Loading your wellness store…</div>
+      </div>
+    );
     if(page==="home")     return <Home setPage={setPage}/>;
     if(page==="quiz")     return <Quiz setPage={setPage}/>;
     if(page==="brands")   return <Brands setPage={setPage}/>;
